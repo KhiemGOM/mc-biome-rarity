@@ -1,0 +1,56 @@
+{
+ "64": {
+  "spearman": 0.9865158371040723,
+  "kendall": 0.923137254901961,
+  "top5_center": [
+   "mushroom_fields",
+   "pale_garden",
+   "windswept_gravelly_hills",
+   "stony_peaks",
+   "ice_spikes"
+  ],
+  "top5_disc": [
+   "mushroom_fields",
+   "pale_garden",
+   "windswept_gravelly_hills",
+   "eroded_badlands",
+   "ice_spikes"
+  ],
+  "max_rank_move": 7,
+  "biggest_movers": {
+   "desert": 7,
+   "cherry_grove": 6,
+   "warm_ocean": 5,
+   "frozen_ocean": 5,
+   "swamp": 4,
+   "meadow": 4
+  }
+ },
+ "128": {
+  "spearman": 0.9694117647058823,
+  "kendall": 0.8729411764705883,
+  "top5_center": [
+   "mushroom_fields",
+   "pale_garden",
+   "windswept_gravelly_hills",
+   "stony_peaks",
+   "ice_spikes"
+  ],
+  "top5_disc": [
+   "mushroom_fields",
+   "windswept_gravelly_hills",
+   "pale_garden",
+   "eroded_badlands",
+   "ice_spikes"
+  ],
+  "max_rank_move": 9,
+  "biggest_movers": {
+   "desert": 9,
+   "cherry_grove": 8,
+   "warm_ocean": 8,
+   "frozen_ocean": 6,
+   "snowy_taiga": 6,
+   "old_growth_spruce_taiga": 6
+  }
+ }
+}
