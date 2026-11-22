@@ -551,3 +551,35 @@ Each number is reported as $\hat\mu\ \pm\ \varepsilon$ with $\varepsilon = \max(
 So the statistics of section 8.2 computed from the rows are exactly those of the full scan for every biome in $B$, which is every biome seen in the pilot. A biome outside $B$ would only get rows that are exact up to $\rho$; none is reported. All radii run in one pass (the widest still active radius sets the strip), and radii drop out of later chunks by the predictable rule of Theorem 20, so each radius uses a prefix of the seeds.
 
 **Cost (measured on 48 rays, cap 540,000, all three radii):** mean reach 255k / 158k / 138k blocks for $r = 0 / 64 / 128$, 9.1 s per ray on one cloud core, against 20 s for full caps run separately.
+
+## 9. Certifying an order from the paired difference (proof; not yet in the sampler)
+
+Section 8 orders two biomes only when their ranges are disjoint. Both biomes are measured on the same seeds and rays, so the difference can be certified directly.
+
+For biomes $a, b$ at radius $r$ with the common cap $C$, $\Delta_{ab} = \mathbb E[D_a] - \mathbb E[D_b] = (A_a - A_b) + S_a T_a - S_b T_b$ (Theorem 18 for each). Per seed, $V_i = W_{a,i} - W_{b,i} + JC \in [0, 2JC]$ and $\mathbb E[V_i]/J = A_a - A_b + C$.
+
+**Theorem 23 [P | A1, A2].** Fix, before seeing production data, a list $\Pi$ of ordered pairs. Give each pair one more confidence sequence (the Corollary of 8.2 on $V_i$ with $R = 2C$), with levels added to the budget of Theorem 20. Then with probability $\ge 1 - \alpha$ all sequences hold at once at the final time, and on that event, for every $(a, b) \in \Pi$:
+
+1. $A_a - A_b \in [\ell_{ab}, u_{ab}]$ with no further assumption, and
+2. under $H_C$ for $a$ and $b$, $\Delta_{ab} \ge \ell_{ab} + S_{a,\rm lo}T_{a,\rm lo} - S_{b,\rm hi}T_{b,\rm hi} - 1$ (the $-1$ covers rounding, Proposition 21, $\frac12$ per biome).
+
+So $a$ is certified rarer than $b$ when that lower bound is $> 0$.
+
+*Proof.* Union bound over all sequences (Theorem 17); $V_i$ is bounded in $[0, 2JC]$ and iid across seeds under A1, so the Corollary applies; then $\Delta = (A_a - A_b) + S_aT_a - S_bT_b$ is increasing in $S_a, T_a$ and decreasing in $S_b, T_b$, all non negative. $\square$
+
+**Proposition 24 [P] (it is never wider, and is about half the seeds when the two are uncorrelated).** Let $\sigma_a^2, \sigma_b^2$ be the per seed variances of $W_a, W_b$ and $\varrho$ their correlation. For intervals whose half width is $\kappa z \sigma / \sqrt N$ (Theorem 16's leading term), disjoint intervals need a gap of $\kappa z(\sigma_a + \sigma_b)/\sqrt N$ while the paired sequence needs $\kappa z \sqrt{\sigma_a^2 + \sigma_b^2 - 2\varrho\sigma_a\sigma_b}/\sqrt N$. Since $\varrho \ge -1$, the second is $\le$ the first. For $\sigma_a = \sigma_b$ and $\varrho = 0$ the seeds needed for a given gap fall by the factor $(2/\sqrt 2)^2 = 2$; for $\varrho > 0$ by more.
+
+*Proof.* $\sigma_a^2 + \sigma_b^2 - 2\varrho\sigma_a\sigma_b \le \sigma_a^2 + \sigma_b^2 + 2\sigma_a\sigma_b = (\sigma_a + \sigma_b)^2$. Seeds scale as the square of the required width. $\square$ (The tail terms are not paired, but they are $\le 2\%$ of each number here, so they add little.)
+
+What it cannot do: a true gap of 1% still needs the paired width under 1%, so roughly $(5 / 1)^2 / 2 \approx 12$ times the seeds of a $\pm 5\%$ run for an uncorrelated pair.
+
+## 10. Skipping cells with a Lipschitz bound: checked, and it does not work with global bounds
+
+Idea: if a cell's climate point is far from every box of a rare biome, nearby cells cannot be that biome either, so their lookups could be skipped. The nearest box distance $\sqrt{d(n, \text{box})}$ is 1 Lipschitz in the climate vector $n$ (each coordinate term $\max(0, lo - n_k, n_k - hi)$ is 1 Lipschitz, and a Euclidean norm of 1 Lipschitz terms is 1 Lipschitz). So if $\sqrt{d_b(n)} - \sqrt{d_{\rm best}(n)} > 2\eta$ and $\lVert n(q') - n(q)\rVert \le \eta$, then $q'$ is not biome $b$, whatever the tie rule (strict inequality) [P], provided the tree search returns a true nearest box [C, to be tested against brute force].
+
+The obstacle is $\eta$. A rigorous bound on how fast the climate changes between cells, from the octave amplitudes and lacunarities of 1.21 (crude gradient bound $8.5\sqrt 2$ per unit for improved Perlin noise, measured on the actual generator), gives:
+
+* the shift noise moves the sampling point by up to 9.7 cells, so two neighbouring cells may sample climate up to about 20 cells apart;
+* the resulting bound on the change of continentalness between cells 1 apart is about 4.3, and of weirdness about 5.8, in units where the whole range is about $\pm 1$.
+
+Those bounds are useless: no cell could ever be skipped. The real noise is far smoother than the worst case, but a guarantee must use a provable bound, and the shift noise's high frequency octaves make the global bound loose. A *local* version (interval arithmetic on each octave's actual lattice gradients over a small region, including the shift) might be much tighter. That is a research question, not a known speedup, and the earlier estimate of "5x or more" in chat was not justified.
