@@ -264,3 +264,32 @@ def test_until_keeps_a_met_radius_running_up_to_n_max(monkeypatch):
     assert cw.active_radii(plan, data) == []
     assert cw.active_radii(plan, data, until=8) == [0]                 # 64 is at its n_max of 4
     assert cw.active_radii(plan, data, until=4) == []                  # both already at 4 seeds
+
+
+@pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
+def test_pair_order_contains_estimates_and_rank_ranges(tmp_path):
+    plan = tiny_plan(tmp_path)
+    cw.run(plan, log=lambda *a: None)
+    o = cw.pair_order(plan, 1e-3)
+    nb = len(plan["biomes"])
+    for r, v in o["radii"].items():
+        assert len(v["pairs"]) == nb * (nb - 1) // 2
+        for p in v["pairs"]:
+            assert p["lo"] <= p["diff"] <= p["hi"] and p["dA_lo"] <= p["dA_hi"]
+        for pos, x in enumerate(v["ranks"], 1):
+            assert x["rank_lo"] <= pos <= x["rank_hi"]
+    assert os.path.exists(os.path.join(plan["out"], "order.md"))
+
+
+def test_paired_interval_covers_the_true_difference():
+    """Coverage of the pair sequence on a synthetic world with known means (exponential, independent per biome)."""
+    rng = np.random.default_rng(5)
+    Ta, Tb, C, J, n, a = 3000.0, 2500.0, 12000, 1, 600, 0.05
+    true = (Ta * (1 - np.exp(-C / Ta))) - (Tb * (1 - np.exp(-C / Tb)))       # E[min(D, C)] difference
+    pr = cw._pair_prior(Ta, C, Tb, C, J, 1)
+    miss = 0
+    for t in range(60):
+        Wa = np.minimum(rng.exponential(Ta, n), C); Wb = np.minimum(rng.exponential(Tb, n), C)
+        lo, hi = cw.th.BettingCS(np.full(n, float(J)), Wa - Wb + J * C, J, 0.0, 2.0 * C, a, n, *pr).interval()
+        miss += not (lo - C <= true <= hi - C)
+    assert miss <= 3

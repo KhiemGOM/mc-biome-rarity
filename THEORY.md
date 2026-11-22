@@ -552,7 +552,7 @@ So the statistics of section 8.2 computed from the rows are exactly those of the
 
 **Cost (measured on 48 rays, cap 540,000, all three radii):** mean reach 255k / 158k / 138k blocks for $r = 0 / 64 / 128$, 9.1 s per ray on one cloud core, against 20 s for full caps run separately.
 
-## 9. Certifying an order from the paired difference (proof; not yet in the sampler)
+## 9. Certifying an order from the paired difference
 
 Section 8 orders two biomes only when their ranges are disjoint. Both biomes are measured on the same seeds and rays, so the difference can be certified directly.
 
@@ -572,6 +572,18 @@ So $a$ is certified rarer than $b$ when that lower bound is $> 0$.
 *Proof.* $\sigma_a^2 + \sigma_b^2 - 2\varrho\sigma_a\sigma_b \le \sigma_a^2 + \sigma_b^2 + 2\sigma_a\sigma_b = (\sigma_a + \sigma_b)^2$. Seeds scale as the square of the required width. $\square$ (The tail terms are not paired, but they are $\le 2\%$ of each number here, so they add little.)
 
 What it cannot do: a true gap of 1% still needs the paired width under 1%, so roughly $(5 / 1)^2 / 2 \approx 12$ times the seeds of a $\pm 5\%$ run for an uncorrelated pair.
+
+### 9.1 In the sampler: every pair, per biome caps (`certwalk.py order`, added 2026-11-23)
+
+**Proposition 28 [P | A1, A2].** Take the family $\Pi$ of *all* unordered pairs of stop set biomes at every radius of the plan, with level $\alpha_{\rm pair} / (|\Pi| \cdot \#\text{radii})$ each. For a pair $(a, b)$ with caps $C_a, C_b$ (8.8), let $V_i = W_{a,i} - W_{b,i} + J C_b \in [0, J(C_a + C_b)]$, so $\mathbb E[V_i]/J = A_a - A_b + C_b$. The bets' constants come from independent exponential worlds with the pilot means (`_pair_prior`, fixed random seed). Then, except with chance at most $\alpha + \alpha_{\rm pair}$, every range of Theorem 20 and every pair bound
+$$\Delta_{ab} \in \big[\, \ell_{ab} - C_b + S_{a,\rm lo}T_{a,\rm lo} - S_{b,\rm hi}T_{b,\rm hi} - 1,\ \ u_{ab} - C_b + S_{a,\rm hi}T_{a,\rm hi} - S_{b,\rm lo}T_{b,\rm lo} + 1 \,\big]$$
+hold at once, the upper and lower tail terms using $H_C$ exactly as in Theorem 23.
+
+*Proof.* As Theorem 23. $V_i$ is bounded and iid across seeds (A1), so the Corollary of 8.2 applies with $R = C_a + C_b$. The union bound runs over Theorem 20's sequences and the pair sequences. $\square$
+
+**Why choosing it after seeing data is allowed.** The family (all pairs), the levels (an equal split) and the bets (pilot only) do not depend on any production data. So the coverage event for the pair sequences has probability $\ge 1 - \alpha_{\rm pair}$, whenever and for whatever reason the computation is run. Picking only the pairs that *looked* close in the report would not be allowed. That is why every pair is included. *Disclosure:* this was added on 2026-11-23, after the first r = 128/512 report showed large ties. The quoted failure chance for order statements is $\alpha + \alpha_{\rm pair} = 2 \times 10^{-6}$.
+
+**Rank ranges.** Biome $x$ has rank between $1 + \#\{y : y \text{ certified rarer than } x\}$ and $N - \#\{y : y \text{ certified more common}\}$. On the coverage event the true rank lies in that range.
 
 ## 10. Skipping cells with a Lipschitz bound: checked, and it does not work with global bounds
 

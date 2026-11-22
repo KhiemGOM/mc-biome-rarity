@@ -376,6 +376,91 @@ def report(plan, names=None):
     return cert
 
 
+# ------------------------------------------------------------------ pairwise order (THEORY.md 9.1)
+def _pair_prior(Ta, Ca, Tb, Cb, J, seed, n=4000):
+    """Bet constants for V = W_a - W_b + J C_b in [0, J (C_a + C_b)], from independent exponential worlds with the
+    pilot means (any constant is valid, Theorem 16; these depend on the pilot only)."""
+    rng = np.random.default_rng(seed)
+    Da = rng.exponential(Ta, size=(n, J)); Db = rng.exponential(Tb, size=(n, J))
+    V = np.minimum(Da, Ca).sum(1) - np.minimum(Db, Cb).sum(1) + J * Cb
+    return th.BettingCS.pilot_priors(np.full(n, float(J)), V, J, 0.0, float(Ca + Cb))
+
+
+def pair_order(plan, alpha_pair, names=None, radii=None, log=None):
+    """Every unordered pair of stop set biomes at every radius gets one more sequence on the paired per seed
+    difference, at level alpha_pair / (#pairs x #radii). The family is all pairs, fixed by the plan, so nothing here
+    depends on production data. On the event that these and Theorem 20's sets all hold (chance >= 1 - alpha -
+    alpha_pair), Delta_ab = E[D_a] - E[D_b] lies in [lo, hi] for every pair at once (Theorem 23, Proposition 28)."""
+    names = names or {int(k): v for k, v in plan.get("names", {}).items()}
+    data = load_arm(plan, "spawn")
+    if data is None:
+        raise ValueError("no chunk in the manifest")
+    A0, si0, man = data
+    J, bs = plan["rays"], [int(b) for b in plan["biomes"]]
+    radii = list(plan["radii"]) if radii is None else radii
+    npairs = len(bs) * (len(bs) - 1) // 2
+    a_each = alpha_pair / (npairs * len(plan["radii"]))
+    out = dict(plan_hash=plan_hash(plan), alpha=plan["alpha"], alpha_pair=alpha_pair, alpha_each_pair=a_each, radii={})
+    for r in radii:
+        n = n_of(man, r); keep = si0 < n; A, si = A0[keep], si0[keep]
+        inc = np.ones(n, bool)
+        W, Q = {}, {}
+        for b in bs:
+            C = cap_of(plan, b, r)
+            Wb, Kb, Eb, Xb = walk_terms(A, si, n, J, b, r, C)
+            W[b] = Wb; Q[b] = quantity_from(Wb, Kb, Eb, Xb, plan, b, r)
+        pairs = []
+        for i, a in enumerate(bs):
+            for b in bs[i + 1:]:
+                Ca, Cb = cap_of(plan, a, r), cap_of(plan, b, r)
+                Ta, Tb = plan["priors"][qkey(a, r)]["T_hat"], plan["priors"][qkey(b, r)]["T_hat"]
+                pr = _pair_prior(Ta, Ca, Tb, Cb, J, 7919 * a + 104729 * b + int(r))
+                V = W[a] - W[b] + J * Cb
+                lo, hi = th.BettingCS(J * inc.astype(float), V, J, 0.0, float(Ca + Cb), a_each, plan["n_star"][str(r)],
+                                      *pr, include=inc).interval()
+                qa, qb = Q[a], Q[b]
+                tail = lambda S, T: S * T if S > 0 else 0.0
+                d_lo = (lo - Cb) + tail(qa["S_lo"], qa["T_lo"]) - tail(qb["S_hi"], qb["T_hi"]) - 2 * ROUNDING
+                d_hi = (hi - Cb) + tail(qa["S_hi"], qa["T_hi"]) - tail(qb["S_lo"], qb["T_lo"]) + 2 * ROUNDING
+                pairs.append(dict(a=a, b=b, diff=qa["ED"] - qb["ED"], lo=float(d_lo), hi=float(d_hi),
+                                  dA_lo=float(lo - Cb), dA_hi=float(hi - Cb)))
+        rarer = {b: set() for b in bs}                    # rarer[x] = biomes certified rarer than x
+        for p in pairs:
+            if p["lo"] > 0: rarer[p["b"]].add(p["a"])
+            elif p["hi"] < 0: rarer[p["a"]].add(p["b"])
+        commoner = {b: {x for x in bs if b in rarer[x]} for b in bs}
+        rows = []
+        for b in sorted(bs, key=lambda x: -Q[x]["ED"]):
+            rows.append(dict(biome=b, name=names.get(b, str(b)), ED=Q[b]["ED"], ED_lo=Q[b]["ED_lo"], ED_hi=Q[b]["ED_hi"],
+                             rank_lo=1 + len(rarer[b]), rank_hi=len(bs) - len(commoner[b]),
+                             unresolved=[names.get(x, str(x)) for x in bs if x != b and x not in rarer[b] and x not in commoner[b]]))
+        out["radii"][str(r)] = dict(seeds=n, pairs=pairs, ranks=rows)
+        if log:
+            log(f"r={r}: {sum(p['lo'] > 0 or p['hi'] < 0 for p in pairs)} of {len(pairs)} pairs ordered")
+    with open(os.path.join(plan["out"], "order.json"), "w") as f:
+        json.dump(out, f, indent=1, default=float)
+    with open(os.path.join(plan["out"], "order.md"), "w") as f:
+        f.write(_order_md(out, plan))
+    return out
+
+
+def _order_md(o, plan):
+    tot = o["alpha"] + o["alpha_pair"]
+    s = [f"# Certified ranking from paired differences\n",
+         f"Every biome pair is compared on the same seeds and rays (THEORY.md 9.1). A rank range says where the biome "
+         f"can be: rank 3 to 5 means exactly 2 biomes are certified rarer and the others in between are not separated "
+         f"from it. Except with chance at most {tot:g} (1 in {1 / tot:,.0f}) every statement below and every range of "
+         f"report.md hold at once.\n",
+         f"Plan `{o['plan_hash'][:16]}`.\n"]
+    for r, v in o["radii"].items():
+        s.append(f"\n## Sight radius {r} ({v['seeds']} seeds)\n\n| rank | biome | E[D] from spawn | not separated from |\n|---|---|---|---|")
+        for x in v["ranks"]:
+            rk = f"{x['rank_lo']}" if x["rank_lo"] == x["rank_hi"] else f"{x['rank_lo']} to {x['rank_hi']}"
+            un = ", ".join(x["unresolved"]) if len(x["unresolved"]) <= 6 else f"{len(x['unresolved'])} biomes"
+            s.append(f"| {rk} | {x['name']} | {_fmt(x['ED'])} | {un or 'none'} |")
+    return "\n".join(s) + "\n"
+
+
 def _fmt(x):
     return f"{x:,.0f}" if math.isfinite(x) else "inf"
 
@@ -480,7 +565,8 @@ def verify(plan, arm, samples=3, rng=None):
 # ------------------------------------------------------------------ CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["plan", "run", "report", "verify"])
+    ap.add_argument("cmd", choices=["plan", "run", "report", "verify", "order"])
+    ap.add_argument("--alpha-pair", type=float, default=1e-6, help="order: failure chance for all pairwise sequences")
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     ap.add_argument("--seed0", type=int, default=10_000_000_000)
@@ -539,6 +625,9 @@ def main(argv=None):
     plan["out"] = os.path.join(ROOT, plan["out"])
     if a.cmd == "run":
         run(plan, until=a.until)
+    elif a.cmd == "order":
+        pair_order(plan, a.alpha_pair, log=print)
+        print(open(os.path.join(plan["out"], "order.md")).read())
     elif a.cmd == "report":
         report(plan, names)
         print(open(os.path.join(plan["out"], "report.md")).read())
