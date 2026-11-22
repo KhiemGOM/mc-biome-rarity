@@ -626,3 +626,13 @@ The tree search returns a leaf $\ell$ of the 1.21 table. A leaf has a box $\prod
 **Early stop (8.7) and the error budget (8.6) are unchanged.** Lemma 22a and Proposition 22 only use that each cell contributes its biomes at its exact $D_c$. A cell now contributes a set of biomes at the same $D_c$, and the stop set rule and the reach row are per biome. Rounding, geometry and the tail are as before.
 
 **Cost.** 1.27x the surface only scan on the same rays (3.84 s vs 3.02 s for 4 seeds x 4 rays, radii 0, 64, 128, cap 20,000, 4 cloud threads). One noise sample per cell, as before, plus a filtered search and 96 x 4 additions.
+
+### 8.10 Continuing a finished run (`run --until N`)
+
+A run stops by itself once every target biome meets its precision. `certwalk.py run --until N` keeps every radius still in the last chunk going until it has $\min(N, n^{\max}_r)$ seeds, met target or not.
+
+**Proposition 27 [P | A1, A2].** The guarantee of Theorem 20 holds for the report made after any such continuation, at the same failure chance $\delta$, for any number of continuations decided after looking at earlier reports.
+
+*Proof.* The sequences are confidence sequences, so they cover at every stopping time at once (Theorem 20). The decision to continue, and where to stop, is a function of chunks already finished, so the final seed count is a stopping time. The seeds stay a prefix of the planned seed order: chunk $k$ always uses seeds $s_0 + k \cdot \text{chunk}$ onward. And $n^{\max}_r$ comes from the hashed plan, so the reserved seed range in the ledger is not exceeded. No new sequence is opened, so $\delta$ is unchanged. $\square$
+
+A radius that the stopping rule already dropped is not revived. Its seeds would no longer be a prefix.

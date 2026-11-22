@@ -273,8 +273,10 @@ def stats_at(plan, data, r, b):
     return qs, qu, bias(qs, qu, plan, b, r, n)
 
 
-def active_radii(plan, data):
-    """Predictable stopping rule: decided from completed chunks only. A radius once dropped stays dropped."""
+def active_radii(plan, data, until=None):
+    """Predictable stopping rule: decided from completed chunks only. A radius once dropped stays dropped.
+    until: continue every radius to at least min(until, n_max) seeds, met target or not. The sequences cover at every
+    stopping time (Theorem 20), so deciding to continue after seeing results keeps the guarantee (THEORY.md 8.10)."""
     if data.get("spawn") is None:
         return list(plan["radii"])
     man = data["spawn"][2]
@@ -283,6 +285,8 @@ def active_radii(plan, data):
         n = n_of(man, r)
         if n >= plan["n_max"][str(r)]:
             continue
+        if until is not None and n < until:
+            out.append(r); continue
         if n < plan["chunk"]:
             out.append(r); continue
         for b in plan["target_biomes"]:
@@ -308,7 +312,7 @@ def _run_chunk(g, k, s0, radii, log):
     log(f"{g['origin']}: chunk {k} done (seeds {s0}..{s0 + g['chunk'] - 1}, radii {radii})")
 
 
-def run(plan, log=print):
+def run(plan, log=print, until=None):
     for arm in ARMS:
         if plan["arm_radii"][arm]:
             os.makedirs(arm_plan(plan, arm)["out"], exist_ok=True)
@@ -319,7 +323,7 @@ def run(plan, log=print):
             if ur:
                 _run_chunk(g, c["k"], c["seed0"], ur, log)
         data = {arm: load_arm(plan, arm) for arm in ARMS}
-        act = active_radii(plan, data)
+        act = active_radii(plan, data, until)
         if not act:
             log("done"); return
         k = len(data["spawn"][2]) if data["spawn"] else 0
@@ -495,6 +499,7 @@ def main(argv=None):
     ap.add_argument("--chunk", type=int, default=250)
     ap.add_argument("--uniform-L", type=int, default=1_000_000)
     ap.add_argument("--samples", type=int, default=3)
+    ap.add_argument("--until", type=int, default=None, help="run: continue every radius to this many seeds (capped at n_max)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     pp = os.path.join(a.out, "plan.json")
@@ -533,7 +538,7 @@ def main(argv=None):
     plan["threads"] = a.threads
     plan["out"] = os.path.join(ROOT, plan["out"])
     if a.cmd == "run":
-        run(plan)
+        run(plan, until=a.until)
     elif a.cmd == "report":
         report(plan, names)
         print(open(os.path.join(plan["out"], "report.md")).read())

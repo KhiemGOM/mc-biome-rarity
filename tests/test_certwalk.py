@@ -252,3 +252,15 @@ def test_common_biome_gets_a_finite_interval_with_its_own_cap():
         assert math.isfinite(q["ED_hi"]) and q["rel_half"] < 0.1
         bad += not (q["ED_lo"] <= T <= q["ED_hi"])
     assert bad == 0
+
+
+def test_until_keeps_a_met_radius_running_up_to_n_max(monkeypatch):
+    """until overrides a met target (any stopping time is valid, Theorem 20) but never passes n_max."""
+    plan = dict(radii=[0, 64], n_max={"0": 10, "64": 4}, chunk=2, target_biomes=[1], target={"0": 0.1, "64": 0.1})
+    monkeypatch.setattr(cw, "stats_at", lambda *a: (dict(rel_half=0.01), None, None))     # every target met
+    man = [dict(radii=[0, 64], n=2), dict(radii=[0, 64], n=2)]
+    monkeypatch.setattr(cw, "n_of", lambda m, r: sum(c["n"] for c in m if r in c["radii"]))
+    data = {"spawn": (None, None, man)}
+    assert cw.active_radii(plan, data) == []
+    assert cw.active_radii(plan, data, until=8) == [0]                 # 64 is at its n_max of 4
+    assert cw.active_radii(plan, data, until=4) == []                  # both already at 4 seeds
