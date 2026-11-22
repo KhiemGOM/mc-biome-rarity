@@ -12,11 +12,11 @@ import csv, io, os, subprocess
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CUBI = os.environ.get("CUBIOMES", os.path.expanduser("~/cubiomes"))
+CUBI = os.environ.get("CUBIOMES", os.path.expanduser("~/cubiomes-xp"))
 LIB = os.path.join(CUBI, "libcubiomes.a")
 pytestmark = pytest.mark.skipif(not os.path.exists(LIB), reason="needs a built Cubiomes (./build.sh)")
 FLAGS = ["-O3", "-fwrapv", f"-I{CUBI}"]
-CAVES = {174, 175, 183}          # dripstone_caves, lush_caves, deep_dark
+CAVES = {174, 175, 183}          # dripstone_caves, lush_caves, deep_dark (26.2+ also has sulfur_caves 187)
 
 
 def _cc(out, src, *extra):
@@ -41,18 +41,18 @@ def test_column_check_brute_force(bins):
 TREE_C = r'''
 #include <stdio.h>
 #include <stdint.h>
-#include "tables/btree21wd.h"
-static const uint64_t *N = btree21wd_nodes; static int LEN = sizeof(btree21wd_nodes) / 8;
+#include "tables/btree263.h"
+static const uint64_t *N = btree263_nodes; static int LEN = sizeof(btree263_nodes) / 8;
 static long bad = 0, leaves = 0;
 static void box(int i, int lo[6], int hi[6]) { for (int d = 0; d < 6; d++) { int p = (N[i] >> 8 * d) & 0xFF;
-    lo[d] = btree21wd_param[p][0]; hi[d] = btree21wd_param[p][1]; } }
+    lo[d] = btree263_param[p][0]; hi[d] = btree263_param[p][1]; } }
 static void walk(int idx, int depth) {
-    if (btree21wd_steps[depth] == 0) { int lo[6], hi[6]; box(idx, lo, hi); leaves++;
+    if (btree263_steps[depth] == 0) { int lo[6], hi[6]; box(idx, lo, hi); leaves++;
         printf("L %d %d %d", (int)((N[idx] >> 48) & 0xFF), lo[4], hi[4]);
         for (int d = 0; d < 6; d++) if (d != 4) printf(" %d %d", lo[d], hi[d]); printf("\n"); return; }
-    uint32_t step; do { step = btree21wd_steps[depth]; depth++; } while (idx + step >= LEN);
+    uint32_t step; do { step = btree263_steps[depth]; depth++; } while (idx + step >= LEN);
     int inner = N[idx] >> 48, plo[6], phi[6]; box(idx, plo, phi);
-    for (int i = 0; i < btree21wd_order; i++) { int clo[6], chi[6]; box(inner, clo, chi);
+    for (int i = 0; i < btree263_order; i++) { int clo[6], chi[6]; box(inner, clo, chi);
         if (idx != 0) for (int d = 0; d < 6; d++) if (clo[d] < plo[d] || chi[d] > phi[d]) { bad++; break; }
         walk(inner, depth); inner += step; if (inner >= LEN) break; }
 }

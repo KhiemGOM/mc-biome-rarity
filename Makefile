@@ -1,5 +1,5 @@
-# Cubiomes location: $CUBIOMES if set, else ~/cubiomes. Override with: make CUBIOMES=/path
-CUBIOMES ?= $(HOME)/cubiomes
+# Cubiomes location: $CUBIOMES if set, else ~/cubiomes-xp. Override with: make CUBIOMES=/path
+CUBIOMES ?= $(HOME)/cubiomes-xp
 CUBI ?= $(CUBIOMES)
 export CUBIOMES
 

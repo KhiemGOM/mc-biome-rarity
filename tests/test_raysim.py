@@ -14,7 +14,7 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAYSIM = os.path.join(ROOT, "raysim")
-CUBIOMES = os.path.expanduser(os.environ.get("CUBIOMES", "~/cubiomes"))
+CUBIOMES = os.path.expanduser(os.environ.get("CUBIOMES", "~/cubiomes-xp"))
 LIB = os.path.join(CUBIOMES, "libcubiomes.so")
 MC_1_21 = 28
 MASK = (1 << 64) - 1

@@ -15,7 +15,21 @@
 #include "generator.h"
 #include "util.h"
 #include "fastclimate.h"
+// Minecraft version (THEORY.md 0): 263 = Java 26.3 (xpple/cubiomes fork, default), 214 = 1.21.4 (Winter Drop).
+#ifndef DX_VERSION
+#define DX_VERSION 263
+#endif
+#if DX_VERSION == 263
+#include "tables/btree263.h"
+#define DX_MCV MC_26_3
+#define DX_BT(x) btree263_##x
+#elif DX_VERSION == 214
 #include "tables/btree21wd.h"
+#define DX_MCV MC_1_21_WD
+#define DX_BT(x) btree21wd_##x
+#else
+#error "DX_VERSION must be 263 or 214"
+#endif
 
 #define QY_REF 15
 #define QY_MIN (-16)
@@ -63,8 +77,8 @@ static int surface_only(const Generator *g, int qx, int qz) { return fast_surfac
 static int LAYERS_ALL = 0;            /* 0: surface layer only; 1: every layer of the column */
 static int COL_REF = 0;               /* --debug: brute force column (independent check of the fast path) */
 #define NL (FC_QY_MAX - FC_QY_MIN + 1)
-static const BiomeTree BT21 = { btree21wd_steps, &btree21wd_param[0][0], btree21wd_nodes, btree21wd_order,
-                                sizeof(btree21wd_nodes) / sizeof(uint64_t) };
+static const BiomeTree BT21 = { DX_BT(steps), &DX_BT(param)[0][0], DX_BT(nodes), DX_BT(order),
+                                sizeof(DX_BT(nodes)) / sizeof(uint64_t) };
 // Proposition 26 (THEORY.md 8.9). Every leaf's depth interval is one of a few classes (1.21: [0,0], [0.2,0.9], [1,1],
 // [1.1,1.1]), and np[4] enters the distance only through (distance of np[4] to that interval)^2. So the cost of leaf i
 // at a layer is c_i + g_class(i)(depth), where c_i is the distance over the other five values, which do not change
@@ -367,7 +381,7 @@ static Pos start_of(Generator *g, uint64_t seed) {
 
 static void *worker(void *arg) {
     Job *j = (Job *)arg;
-    Generator g; setupGenerator(&g, str2mc("1.21"), 0);
+    Generator g; setupGenerator(&g, DX_MCV, 0);
     for (long i = j->tid; i < j->seeds; i += j->nth) {
         uint64_t st = j->seed0 + (uint64_t)i;
         uint64_t seed = splitmix64(&st);
@@ -464,7 +478,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "--origin")) { if (!strcmp(v, "spawn")) ORIGIN_L = 0; else if (sscanf(v, "uniform:%ld", &ORIGIN_L) != 1 || ORIGIN_L < 1 || ORIGIN_L > 20000000) return bad("--origin spawn|uniform:L"); }
         else if (!strcmp(a, "--layers")) { if (!strcmp(v, "surface")) LAYERS_ALL = 0; else if (!strcmp(v, "all")) LAYERS_ALL = 1; else return bad("--layers surface|all"); }
         else if (!strcmp(a, "--column-check")) {      /* n random cells per seed: fast bisection vs every layer */
-            long n = atol(v); Generator g; setupGenerator(&g, str2mc("1.21"), 0); long bad_ = 0, tot = 0;
+            long n = atol(v); Generator g; setupGenerator(&g, DX_MCV, 0); long bad_ = 0, tot = 0;
             for (long s = 0; s < seeds; s++) {
                 uint64_t st = seed0 + (uint64_t)s, seed = splitmix64(&st); applySeed(&g, 0, seed);
                 for (long c = 0; c < n; c++) {
@@ -497,7 +511,7 @@ int main(int argc, char **argv) {
         COL_REF = 1;
         uint64_t st = seed0 + (uint64_t)dbg_i, seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL; double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
-        Generator g; setupGenerator(&g, str2mc("1.21"), 0); applySeed(&g, 0, seed);
+        Generator g; setupGenerator(&g, DX_MCV, 0); applySeed(&g, 0, seed);
         Pos sp = start_of(&g, seed);
         double ang = 2.0 * M_PI * ((double)dbg_k + u) / (double)rays;
         printf("# %d %d %.17g\n", sp.x, sp.z, ang);

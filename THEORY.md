@@ -41,7 +41,7 @@ Numerical checks of the theorems on synthetic worlds with known truth are in `te
 
 | constant | value | where | why it exists | estimand? | chosen by | decide? |
 |---|---|---|---|---|---|---|
-| game version | 1.21 | all C code | the study is about 1.21 | yes | you | no |
+| game version | Java 26.3 (results before 2026-11-23: 1.21.4) | all C code, `DX_VERSION` | the study is about the current version; 1.21.5 changed where pale garden generates | yes | you | no |
 | start point | `estimateSpawn` | discexact | "walk from spawn" | yes | you (spawn included, 2026-11-22) | no |
 | biome layer | every layer of the 4x4 column, y = -64..319 (`--layers all`, section 8.9); was the depth 0 layer only until 2026-11-22 | discexact | a biome counts if it is anywhere in the column, caves included, as the old colsim column mode did | yes | you (caves must be in, 2026-11-22) | **yes**: whether a cave deep below counts as found, or only near the walking height |
 | discovery radius $r$ | 0, 64, 128 | plan | how close counts as "found" (sight distance) | yes | placeholders (HANDOFF item 3) | **yes** |
@@ -618,13 +618,13 @@ the set of biomes over all 96 quart layers of the cell (world $y = -64$ to $319$
 
 Write $x_i \in \mathbb Z^6$ for the climate vector at layer $i$. Only the depth $x_{i,4}$ depends on the layer: Cubiomes samples the other five noises at $y = 0$, and the depth is the float $d_i = 1 - 4y/128 - 83/160 + \mathrm{off}$ with the spline offset off fixed per cell, so `fast_np_column` computes the five values and off once and `fast_depth_at` reproduces $x_{i,4}$ with the same operations, bit for bit.
 
-The tree search returns a leaf $\ell$ of the 1.21 table. A leaf has a box $\prod_k [a_k, b_k]$ and cost $c(\ell, x) = \sum_k \phi(x_k; a_k, b_k)$ with $\phi(t; a, b) = \max(t - b, a - t, 0)^2$ in exact unsigned 64 bit arithmetic (no overflow: each term is below $2^{31}$).
+The tree search returns a leaf $\ell$ of the version's table (26.3: `btree263`, 1.21.4: `btree21wd`). A leaf has a box $\prod_k [a_k, b_k]$ and cost $c(\ell, x) = \sum_k \phi(x_k; a_k, b_k)$ with $\phi(t; a, b) = \max(t - b, a - t, 0)^2$ in exact unsigned 64 bit arithmetic (no overflow: each term is below $2^{31}$).
 
 **Lemma 26a [P + C].** For every $x$, `climateToBiome(x, NULL)` returns the biome of the first leaf, in the search's traversal order, among the leaves of least cost.
 
 *Proof.* Every non-root node's box contains the boxes of its children [C: `test_tree_facts`, all 9,105 parent and child pairs below the root], so a node's cost lower-bounds every leaf below it. By induction on the recursion of `get_resulting_node`: given a current best $(\ell^*, d^*)$, a child subtree is entered only if its bound is $< d^*$, a subtree with bound $\ge d^*$ holds no leaf of cost $< d^*$, and a leaf replaces $\ell^*$ only if its cost is strictly smaller. So after the children are scanned, $\ell^*$ is the first leaf in traversal order of least cost among those seen, and no unseen leaf is cheaper. Starting from $d^* = 2^{64} - 1$ gives the claim. $\square$
 
-**Proposition 26 [P + C] (the class split is exact).** Partition the leaves by their depth interval $[a_4, b_4]$ (classes $K$; in 1.21 there are four: $[0,0]$, $[0.2, 0.9]$, $[1,1]$, $[1.1, 1.1]$ in units of $10^4$ [C]). Let $c_5(\ell) = \sum_{k \ne 4} \phi(x_k; a_k, b_k)$, which does not depend on the layer, and let $w_K$ be the first leaf of class $K$ in traversal order with least $c_5$. Then at every layer $i$ the search's leaf is the first in traversal order among $\{w_K\}$ of least $c_5(w_K) + \phi(x_{i,4}; K)$.
+**Proposition 26 [P + C] (the class split is exact).** Partition the leaves by their depth interval $[a_4, b_4]$ (classes $K$; in 1.21.4 and in 26.3 there are four: $[0,0]$, $[0.2, 0.9]$, $[1,1]$, $[1.1, 1.1]$ in units of $10^4$ [C]; 26.3's sulfur caves leaf is in $[0.2, 0.9]$). Let $c_5(\ell) = \sum_{k \ne 4} \phi(x_k; a_k, b_k)$, which does not depend on the layer, and let $w_K$ be the first leaf of class $K$ in traversal order with least $c_5$. Then at every layer $i$ the search's leaf is the first in traversal order among $\{w_K\}$ of least $c_5(w_K) + \phi(x_{i,4}; K)$.
 
 *Proof.* Let $M$ be the set of least cost leaves at layer $i$ and $\ell^*$ its first element (Lemma 26a). Let $K$ be the class of $\ell^*$. Within $K$ the depth term is the same for all leaves, so $\ell^*$ has least $c_5$ in $K$. Any $\ell \in K$ with the same $c_5$ has the same cost and is in $M$, so it comes after $\ell^*$. Hence $\ell^* = w_K$. Every other $w_{K'}$ costs at least as much, and one that costs the same is in $M$ and comes after $\ell^*$. So the rule picks $\ell^*$. $\square$
 
@@ -683,3 +683,13 @@ for every $b$ and $x$, since $F/F_u$ increases in $F$ and decreases in $F_u$. Th
 *Proof.* Each sequence is a valid betting sequence (the bets use only earlier seeds and constants from a pilot on other seeds), so Theorem 16 and the Corollary give coverage at every stopping time. The union bound adds the $2BK$ failure chances. Monotonicity gives the ratio bounds. $\square$
 
 The default is $\alpha_\rho = 10^{-6}$, separate from the $\alpha$ of the E[D] report. Anyone who wants every statement of both reports at once adds the two failure chances.
+
+
+### 0.1 The generator for 26.3 (added 2026-11-23)
+
+Upstream Cubiomes stops at 1.21.4 (`e61f905`). Mojang's 1.21.5 notes say "Pale Garden biome now occupies more space that was previously taken by Dark Forest", so the earlier certificates are 1.21.4 results. From 2026-11-23 the code builds on the `xpple/cubiomes` fork at `304940b`, which adds `MC_26_3` with a climate table (`btree263`) dumped from the running game's own search tree, the biomes `sulfur_caves` (187) and `dappled_forest` (188), and no change to the overworld noise or the climate spawn search.
+
+What is checked, and how:
+1. **Code to fork [C].** The fast column and surface paths equal the fork's own `sampleBiomeNoise` + `climateToBiome` at `MC_26_3` bit for bit (`tests/test_fastclimate.py`, `tests/test_column.py`: 96,000 random cells, 0 mismatches; byte identical CSV fast vs reference).
+2. **Tree facts [C].** On `btree263` every non root box contains its children's (Lemma 26a), the depth classes are the same four, and the $[0,0]$ and $[1,1]$ classes pair leaf by leaf, 3,795 each (Lemma 26b). Same test, `test_tree_facts`.
+3. **Fork to game [C, on the PC].** `gamecheck/` runs the 26.3 server jar's own code and compares, bit for bit, the climate target point at random cells and all 96 layers, the biome, random points of the whole climate box through the game's parameter list, and the climate spawn position (`findSpawnPosition`, which `estimateSpawn` models). The certificate is only issued if every count is 0, except for exact distance ties where the game's per thread last result hint differs from the hint free search (none expected; each one is reported).
