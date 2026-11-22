@@ -202,7 +202,8 @@ def manifest_path(plan):
 def _origin(plan):
     """Start point option: spawn (default, Cubiomes estimateSpawn) or uniform:L (uniform start in [-L, L]^2)."""
     o = plan.get("origin", "spawn")
-    return [] if o == "spawn" else ["--origin", o]
+    st = plan.get("stopset")
+    return ([] if o == "spawn" else ["--origin", o]) + ([] if not st else ["--stopset", ",".join(map(str, st))])
 
 
 def discexact(seed0, n, radii, plan, out):

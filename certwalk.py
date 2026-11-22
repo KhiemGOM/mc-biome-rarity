@@ -111,45 +111,71 @@ def quantity_from(W, K, E, X, plan, b, r, inc=None):
 
 
 # ------------------------------------------------------------------ plan
-def group_plan(plan, r, arm="spawn"):
-    """The certrun-style plan of one (radius, arm) group: radius r only, cap C_r, its own chunk folder."""
-    return dict(seed0=plan["seed0"], rays=plan["rays"], radii=[int(r)], rmax=int(plan["caps"][str(r)]),
-                R0=0.0, R=float(plan["caps"][str(r)]), chunk=plan["chunk"], threads=plan.get("threads", 1),
-                origin="spawn" if arm == "spawn" else f"uniform:{int(plan['uniform_L'])}",
-                out=os.path.join(plan["out"], f"r{int(r)}_{arm}"))
+REACH = 256                 # discexact row marker: per (seed, ray, radius) the scan reach rho (THEORY.md 8.7)
 
 
-def make_plan(P, pilot_seed0, n_pilot, rays, radii, biomes, targets, target, alpha, alpha_rest, seed0, chunk, out, tail_max=0.05,
-              uniform_L=1_000_000):
+def arm_plan(plan, arm):
+    """The certrun-style plan of one arm: all its radii in one pass, one cap, early stop on the stop set."""
+    return dict(seed0=plan["seed0"], rays=plan["rays"], radii=list(plan["arm_radii"][arm]), rmax=int(plan["cap"]),
+                R0=0.0, R=float(plan["cap"]), chunk=plan["chunk"], threads=plan.get("threads", 1),
+                origin="spawn" if arm == "spawn" else f"uniform:{int(plan['uniform_L'])}", stopset=plan["biomes"],
+                out=os.path.join(plan["out"], arm))
+
+
+def reach_cost(T_targets, C, r, rng, n=20000):
+    """Planning only: mean scan length per ray, E[max_b min(D_b, C)], for independent exponential targets."""
+    D = np.column_stack([rng.exponential(t, n) for t in T_targets])
+    return float(np.minimum(D.max(1), C).mean())
+
+
+def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alpha, alpha_rest, seed0, chunk, out,
+              cap_mult=4.0, uniform_L=1_000_000, uniform_radii=(0,)):
+    """target: {radius: relative half width}. The stop set is every biome seen in the pilot (it must be found or
+    capped before a ray stops, so every one of them gets exact rows). cap = cap_mult x the largest target E[D]."""
     rng = np.random.default_rng(12345)
     idx = {cr.signed(cr.seed_of(pilot_seed0 + i)): i for i in range(n_pilot)}
     si = np.fromiter((idx[s] for s in P[:, 0]), np.int64, P.shape[0])
+    biomes = sorted(int(b) for b in np.unique(P[:, 2]) if 0 <= b < 256)
     T_hat = {}
     for r in radii:
         for b in biomes:
             m = (P[:, 2] == b) & (P[:, 4] == r)
             D = np.full((n_pilot, rays), np.inf); D[si[m], P[m, 1]] = P[m, 3]
             E, X = ct.stats(D, 4000.0, 20000.0)         # pilot only: a rough far-field rate for the tail of the plan
-            M = X.sum() / E.sum() if E.sum() >= 5 else 2e6
+            M = X.sum() / E.sum() if E.sum() >= 5 else 1e6
             T_hat[qkey(b, r)] = float(np.minimum(D, 20000.0).mean() + (D > 20000).mean() * M)
-    caps = {}
-    for r in radii:
-        worst = max(T_hat[qkey(b, r)] for b in targets)
-        caps[str(r)] = int(math.ceil(worst * math.log(1 / tail_max) / 10000.0) * 10000)
-    priors = {qkey(b, r): _sim_priors(min(T_hat[qkey(b, r)], 50 * caps[str(r)]), caps[str(r)], rays, rng)
-              for r in radii for b in biomes}
+    if targets is None:                                 # the 8 rarest in the pilot at any radius
+        targets = sorted({b for r in radii for b in sorted(biomes, key=lambda b: -T_hat[qkey(b, r)])[:8]})
+    worst = max(T_hat[qkey(b, r)] for r in radii for b in targets)
+    cap = int(math.ceil(cap_mult * worst / 10000.0) * 10000)
+    caps = {str(r): cap for r in radii}
+    priors = {qkey(b, r): _sim_priors(min(T_hat[qkey(b, r)], 50 * cap), cap, rays, rng) for r in radii for b in biomes}
     tq = [qkey(b, r) for r in radii for b in targets]
     rest = [qkey(b, r) for r in radii for b in biomes if qkey(b, r) not in tq]
     a_t, a_r = (alpha - alpha_rest) / (SEQS * len(tq)), alpha_rest / (SEQS * max(len(rest), 1))
     aeach = {q: (a_t if q in tq else a_r) for q in tq + rest}
-    n_star = {}
+    n_star, reach = {}, {}
     for r in radii:
         cv2 = max(priors[qkey(b, r)]["cv2"] for b in targets)
-        n_star[str(r)] = int(math.ceil(2 * KAPPA ** 2 * math.log(2 / a_t) * cv2 / (rays * (0.9 * target) ** 2)))
-    cost = len(ARMS) * sum(n_star[str(r)] * rays * cr.sec_per_ray(r, caps[str(r)]) for r in radii)
-    plan = dict(seed0=seed0, rays=rays, uniform_L=uniform_L, radii=list(radii), caps=caps, chunk=chunk, alpha=alpha, alpha_rest=alpha_rest,
-                biomes=list(biomes), target_biomes=list(targets), target=target, tail_max=tail_max, alpha_each=aeach,
+        n_star[str(r)] = int(math.ceil(2 * KAPPA ** 2 * math.log(2 / a_t) * cv2 / (rays * (0.9 * target[r]) ** 2)))
+        reach[str(r)] = reach_cost([T_hat[qkey(b, r)] for b in biomes if T_hat[qkey(b, r)] < cap], cap, r, rng)
+    # one pass: a ray costs the widest still active radius over its stretch (planning estimate, independent radii)
+    order = sorted(radii, reverse=True)
+    def ray_cost(active):
+        c, done = 0.0, 0.0
+        for r in sorted(active, reverse=True):
+            L = max(reach[str(r)] - done, 0.0); c += L * cr.SEC_PER_CELL * (5573 + 2510 * r) / 20000.0; done = max(done, reach[str(r)])
+        return c
+    ns = sorted(set(n_star.values())); cost, prev = 0.0, 0
+    for nv in ns:
+        act = [r for r in radii if n_star[str(r)] >= nv]
+        cost += (nv - prev) * rays * (ray_cost(act) + (ray_cost([0]) if 0 in act and 0 in uniform_radii else 0.0))
+        prev = nv
+    plan = dict(seed0=seed0, rays=rays, uniform_L=uniform_L, radii=list(radii), cap=cap, caps=caps, chunk=chunk, alpha=alpha,
+                alpha_rest=alpha_rest, biomes=biomes, names={str(b): names.get(b, str(b)) for b in biomes},
+                target_biomes=list(targets), target={str(r): target[r] for r in radii}, cap_mult=cap_mult, alpha_each=aeach,
                 priors=priors, n_star=n_star, n_max={k: 2 * v for k, v in n_star.items()}, expected_cpu_s=cost,
+                arm_radii={"spawn": list(radii), "uniform": [r for r in radii if r in uniform_radii]},
                 pilot=dict(seed0=pilot_seed0, n=n_pilot), out=out)
     plan["hash"] = plan_hash(plan)
     return plan
@@ -157,8 +183,8 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, biomes, targets, target, alp
 
 def plan_hash(plan):
     import hashlib
-    keys = ["seed0", "rays", "uniform_L", "radii", "caps", "chunk", "alpha", "alpha_rest", "biomes", "target_biomes", "target",
-            "alpha_each", "priors", "n_star", "n_max"]
+    keys = ["seed0", "rays", "uniform_L", "radii", "cap", "caps", "chunk", "alpha", "alpha_rest", "biomes", "target_biomes",
+            "target", "alpha_each", "priors", "n_star", "n_max", "arm_radii"]
     return hashlib.sha256(json.dumps({k: plan[k] for k in keys}, sort_keys=True).encode()).hexdigest()
 
 
@@ -168,106 +194,150 @@ def check_alpha(plan):
         raise ValueError(f"alpha_each must cover every (biome, radius); {SEQS} sequences each must sum to at most alpha")
 
 
-# ------------------------------------------------------------------ run (sequential per radius, both arms in lockstep)
-def load_arms(plan, r):
-    """Both arms of radius r, integrity checked, cut to the seeds both have (pairing needs the same seeds)."""
-    out = {}
-    for arm in ARMS:
-        g = group_plan(plan, r, arm)
-        if not cr.load_manifest(g):
-            return None
-        out[arm] = cr.load_all(g)
-    n = min(sum(c["n"] for c in man) for _, _, man in out.values())
-    for arm, (A, si, man) in out.items():
-        keep = si < n
-        out[arm] = (A[keep], si[keep])
-    return out, n
+# ------------------------------------------------------------------ data: early stop integrity (THEORY.md 8.7)
+def check_reach(A, n, rays, radii, stopset, cap):
+    """Every (seed, ray, radius) has one reach row rho; if rho < cap every stop set biome has a row with D <= rho.
+    Under that, every stop set row is the exact full scan minimum and a missing one means D > cap (Proposition 22)."""
+    R = A[A[:, 2] == REACH]
+    if R.shape[0] != n * rays * len(radii) or np.unique(R[:, [0, 1, 4]], axis=0).shape[0] != R.shape[0]:
+        raise ValueError("reach rows: one per (seed, ray, radius) expected")
+    early = R[R[:, 3] < cap]
+    if early.size:
+        rho = {(a, b, c): d for a, b, c, d in early[:, [0, 1, 4, 3]].tolist()}
+        S = A[np.isin(A[:, 2], np.asarray(stopset))]
+        cnt = {}
+        for s_, k, b, d, r in S[:, [0, 1, 2, 3, 4]].tolist():
+            key = (s_, k, r)
+            if key in rho and d <= rho[key]:
+                cnt[key] = cnt.get(key, 0) + 1
+        short = [key for key in rho if cnt.get(key, 0) != len(stopset)]
+        if short:
+            raise ValueError(f"{len(short)} rays stopped early without every stop set biome found: data not exact")
 
 
-def stats_at(plan, r, data, n, b):
-    qs = quantity(*data["spawn"], n, plan, b, r)
-    qu = quantity(*data["uniform"], n, plan, b, r)
+def load_arm(plan, arm):
+    g = arm_plan(plan, arm)
+    if not cr.load_manifest(g):
+        return None
+    A, si, man = cr.load_all(g)
+    i = 0
+    for c in man:
+        m = (si >= i) & (si < i + c["n"])
+        check_reach(A[m], c["n"], plan["rays"], c["radii"], plan["biomes"], plan["cap"]); i += c["n"]
+    return A, si, man
+
+
+def n_of(man, r):
+    """Seeds that include radius r. Radii are only ever dropped, so these are a prefix of the seed order."""
+    return sum(c["n"] for c in man if r in c["radii"])
+
+
+def stats_at(plan, data, r, b):
+    """(spawn quantity, uniform quantity or None, bias or None) for (b, r) on the seeds both arms share."""
+    A, si, man = data["spawn"]; n = n_of(man, r)
+    keep = si < n
+    qs = quantity(A[keep], si[keep], n, plan, b, r)
+    if r not in plan["arm_radii"]["uniform"] or data.get("uniform") is None:
+        return qs, None, None
+    Au, siu, manu = data["uniform"]; nu = n_of(manu, r)
+    if nu != n:
+        raise ValueError(f"r={r}: arms disagree on seeds ({n} vs {nu})")
+    keep = siu < n
+    qu = quantity(Au[keep], siu[keep], n, plan, b, r)
     return qs, qu, bias(qs, qu, plan, b, r, n)
 
 
-def active(plan, r):
-    """Predictable stopping rule of radius r: uses only completed chunks of this radius."""
-    got = load_arms(plan, r)
-    if got is None:
-        return True
-    data, n = got
-    if n >= plan["n_max"][str(r)]:
-        return False
-    if n < plan["chunk"]:
-        return True
-    for b in plan["target_biomes"]:
-        qs, qu, _ = stats_at(plan, r, data, n, b)
-        if not (qs["rel_half"] <= plan["target"] and qu["rel_half"] <= plan["target"]):
-            return True
-    return False
+def active_radii(plan, data):
+    """Predictable stopping rule: decided from completed chunks only. A radius once dropped stays dropped."""
+    if data.get("spawn") is None:
+        return list(plan["radii"])
+    man = data["spawn"][2]
+    out = []
+    for r in man[-1]["radii"]:
+        n = n_of(man, r)
+        if n >= plan["n_max"][str(r)]:
+            continue
+        if n < plan["chunk"]:
+            out.append(r); continue
+        for b in plan["target_biomes"]:
+            qs, qu, _ = stats_at(plan, data, r, b)
+            if not (qs["rel_half"] <= plan["target"][str(r)] and (qu is None or qu["rel_half"] <= plan["target"][str(r)])):
+                out.append(r); break
+    return out
 
 
-def _run_chunk(g, k, s0, log):
+def _run_chunk(g, k, s0, radii, log):
     man = cr.load_manifest(g)
     if len(man) > k:
         return
     if len(man) != k:
         raise ValueError(f"{g['out']}: manifest has {len(man)} chunks, expected {k}")
     p = cr.chunk_path(g, k)
-    cr.discexact(s0, g["chunk"], g["radii"], g, p)
-    cr.check_integrity(cr.load_csv(p), s0, g["chunk"], g["rays"], g["radii"])
-    man.append(dict(k=k, seed0=s0, n=g["chunk"], radii=g["radii"]))
+    cr.discexact(s0, g["chunk"], radii, g, p)
+    A = cr.load_csv(p)
+    cr.check_integrity(A, s0, g["chunk"], g["rays"], radii)
+    man.append(dict(k=k, seed0=s0, n=g["chunk"], radii=list(radii)))
     json.dump(man, open(cr.manifest_path(g) + ".tmp", "w"), indent=1)
     os.replace(cr.manifest_path(g) + ".tmp", cr.manifest_path(g))
-    log(f"r={g['radii'][0]} {g['origin']}: chunk {k} done (seeds {s0}..{s0 + g['chunk'] - 1}, cap {g['rmax']})")
+    log(f"{g['origin']}: chunk {k} done (seeds {s0}..{s0 + g['chunk'] - 1}, radii {radii})")
 
 
 def run(plan, log=print):
-    for r in plan["radii"]:
-        for arm in ARMS:
-            os.makedirs(group_plan(plan, r, arm)["out"], exist_ok=True)
-        while active(plan, r):
-            k = min(len(cr.load_manifest(group_plan(plan, r, a))) for a in ARMS)
-            for arm in ARMS:
-                _run_chunk(group_plan(plan, r, arm), k, plan["seed0"] + k * plan["chunk"], log)
-        log(f"r={r}: done")
+    for arm in ARMS:
+        os.makedirs(arm_plan(plan, arm)["out"], exist_ok=True)
+    while True:
+        g = arm_plan(plan, "uniform"); ms, mu = cr.load_manifest(arm_plan(plan, "spawn")), cr.load_manifest(g)
+        for c in ms[len(mu):]:                                     # resume after a crash between the two arms
+            ur = [r for r in c["radii"] if r in plan["arm_radii"]["uniform"]]
+            if ur:
+                _run_chunk(g, c["k"], c["seed0"], ur, log)
+        data = {arm: load_arm(plan, arm) for arm in ARMS}
+        act = active_radii(plan, data)
+        if not act:
+            log("done"); return
+        k = len(data["spawn"][2]) if data["spawn"] else 0
+        s0 = plan["seed0"] + k * plan["chunk"]
+        _run_chunk(arm_plan(plan, "spawn"), k, s0, act, log)
+        ur = [r for r in act if r in plan["arm_radii"]["uniform"]]
+        if ur:
+            g = arm_plan(plan, "uniform")
+            _run_chunk(g, k, s0, ur, log)
 
 
 # ------------------------------------------------------------------ report
 def report(plan, names=None):
     check_alpha(plan)
-    names = names or {}
-    results, cpu, by_r = [], 0.0, {}
+    names = names or {int(k): v for k, v in plan.get("names", {}).items()}
+    data = {arm: load_arm(plan, arm) for arm in ARMS}
+    if data["spawn"] is None:
+        raise ValueError("no chunk in the manifest")
+    results, by_r = [], {}
     for r in plan["radii"]:
-        got = load_arms(plan, r)
-        if got is None:
-            raise ValueError(f"r={r}: no chunk in the manifest")
-        data, n = got
-        C = plan["caps"][str(r)]
-        cpu += len(ARMS) * n * plan["rays"] * cr.sec_per_ray(r, C)
+        n = n_of(data["spawn"][2], r)
         for b in plan["biomes"]:
-            qs, qu, bi = stats_at(plan, r, data, n, b)
-            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), cap=C, seeds=n,
-                       **{k: v for k, v in qs.items() if not k.startswith("_")},
-                       uniform={k: v for k, v in qu.items() if not k.startswith("_")}, **bi)
+            qs, qu, bi = stats_at(plan, data, r, b)
+            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), cap=plan["cap"], seeds=n,
+                       **{k: v for k, v in qs.items() if not k.startswith("_")})
+            if qu is not None:
+                row["uniform"] = {k: v for k, v in qu.items() if not k.startswith("_")}; row.update(bi)
             if int(b) in plan["target_biomes"]:
-                row["target_met"] = bool(qs["rel_half"] <= plan["target"] and qu["rel_half"] <= plan["target"])
-                row["hazard_bins_far_half"] = {}
-                for arm in ARMS:
-                    A, si = data[arm]
-                    m = (A[:, 2] == b) & (A[:, 4] == r)
-                    D = np.full((n, plan["rays"]), np.inf); D[si[m], A[m, 1]] = A[m, 3]
-                    row["hazard_bins_far_half"][arm] = ct.bin_hazards(D, C / 2, C, bins=4)
+                row["target_met"] = bool(qs["rel_half"] <= plan["target"][str(r)])
+                A, si, _ = data["spawn"]; keep = si < n; A, si = A[keep], si[keep]
+                m = (A[:, 2] == b) & (A[:, 4] == r)
+                D = np.full((n, plan["rays"]), np.inf); D[si[m], A[m, 1]] = A[m, 3]
+                C = plan["cap"]
+                row["hazard_bins_far_half"] = ct.bin_hazards(D, C / 2, C, bins=4)
             results.append(row)
             by_r.setdefault(int(r), {})[row["name"]] = dict(lo=row["ED_lo"] - ROUNDING, hi=row["ED_hi"] + ROUNDING)
+    cpu = 0.0
     order = {str(r): cr.certified_order(v) for r, v in by_r.items()}
-    cert = dict(plan_hash=plan_hash(plan), alpha=plan["alpha"], est_cpu_s=cpu, results=results, certified_order=order,
+    cert = dict(plan_hash=plan_hash(plan), alpha=plan["alpha"], results=results, certified_order=order,
                 git=cr._git(), discexact_sha256=cr._sha(cr.EXE) if os.path.exists(cr.EXE) else None,
-                statement=(f"Under A1 and A2, with probability >= {1 - plan['alpha']:.2f} all {SEQS * len(results)} confidence "
-                           f"sequences hold at once (Theorem 20). Then every E[D] >= A_lo and every capped spawn bias is in "
-                           f"[bias_A_lo, bias_A_hi] with no further assumption; E[D] is in [ED_lo, ED_hi] and the full spawn "
-                           f"bias in [bias_lo, bias_hi] if also H_C holds (constant hazard from C/2 on; it only affects the "
-                           f"tail share S*T/E[D]). Certified orders use the H_C intervals."))
+                statement=(f"Model: one walk from spawn in a uniformly random direction (THEORY.md 1). Hard bounds: geometry "
+                           f"error 0, rounding at most 0.5 blocks (included). Random part: except with chance at most "
+                           f"{plan['alpha']:g} over the seeds (A1, A2), every range below holds at once (Theorem 20). "
+                           f"The lower end of every E[D] range needs nothing more; the upper end also uses H_C (constant "
+                           f"hazard from C/2 on), which affects only the tail share."))
     with open(os.path.join(plan["out"], "certificate.json"), "w") as f:
         json.dump(cert, f, indent=1, default=float)
     with open(os.path.join(plan["out"], "report.md"), "w") as f:
@@ -298,23 +368,76 @@ def _markdown(cert, plan):
            f"most {d:g} over the random seeds (1 in {1 / d:,.0f}). Geometry error is 0 and rounding at most ±0.5 blocks "
            f"(both certain, included in ε). The part past the cap rests on the constant hazard assumption and is shown "
            f"as the tail share; the lower end of each range needs no assumption at all.\n",
-           f"About {cert['est_cpu_s'] / 3600:.1f} CPU hours. Plan `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
+           f"Plan `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
     for r in plan["radii"]:
         rows = [x for x in cert["results"] if x["radius"] == r]
         top = sorted(rows, key=lambda x: -x["ED"])[:15]
-        out.append(f"\n## Sight radius {r}, cap {plan['caps'][str(r)]:,} blocks (rarest 15)\n\n"
+        out.append(f"\n## Sight radius {r}, cap {plan['cap']:,} blocks (rarest 15)\n\n"
                    "| rank | biome | E[D] from spawn | ± ε | guaranteed at least | tail share | from a random start | spawn bias | seeds |"
                    "\n|---|---|---|---|---|---|---|---|---|")
         rank = 1
         for g in tie_groups(top):
             lab = str(rank) if len(g) == 1 else f"{rank} (tied)"
             for x in g:
-                u = x["uniform"]; e = x["eps_MC"] + x["eps_rounding"]
+                u = x.get("uniform"); e = x["eps_MC"] + x["eps_rounding"]
+                if u is None:
+                    out.append(f"| {lab} | {x['name']} | {_fmt(x['ED'])} | {_fmt(e)} | {_fmt(x['ED_lower_no_assumption'] - ROUNDING)} | "
+                               f"{100 * x['tail_share']:.1f}% | not run | | {x['seeds']} |")
+                    continue
                 out.append(f"| {lab} | {x['name']} | {_fmt(x['ED'])} | {_fmt(e)} | {_fmt(x['ED_lower_no_assumption'] - ROUNDING)} | "
                            f"{100 * x['tail_share']:.1f}% | {_fmt(u['ED'])} ± {_fmt(u['eps_MC'] + ROUNDING)} | "
                            f"{_fmt(x['bias'])} [{_fmt(x['bias_lo'] - 1)}, {_fmt(x['bias_hi'] + 1)}] | {x['seeds']} |")
             rank += len(g)
     return "\n".join(out) + "\n"
+
+
+# ------------------------------------------------------------------ verify (independent of the early stop)
+def verify(plan, arm, samples=3, rng=None):
+    """For random production (seed, ray): rerun discexact --debug (a full scan, no early stop) up to just past the
+    ray's reach, recompute every cell's D with theory.cell_D, and check that every production row with D <= reach is
+    the full scan minimum and that no full scan minimum <= reach is missing (Proposition 22)."""
+    import subprocess
+    rng = rng or np.random.default_rng()
+    data = load_arm(plan, arm)
+    A, si, man = data
+    J = plan["rays"]; n_total = sum(c["n"] for c in man)
+    g = arm_plan(plan, arm)
+    st = dict(rays_checked=0, cells_checked=0, max_abs_D_err=0.0, rows_mismatch=0, rows_checked=0)
+    for _ in range(samples):
+        i, k = int(rng.integers(n_total)), int(rng.integers(J))
+        radii = next(c["radii"] for c in man if c["seed0"] <= plan["seed0"] + i < c["seed0"] + c["n"])
+        s = cr.signed(cr.seed_of(plan["seed0"] + i))
+        rows = A[(A[:, 0] == s) & (A[:, 1] == k)]
+        reach = {int(r): int(d) for d, r in rows[rows[:, 2] == REACH][:, [3, 4]]}
+        rm = int(min(plan["cap"], max(reach.values()) + 16))
+        cmd = [cr.EXE, "--seed0", str(plan["seed0"]), "--rays", str(J), "--rmax", str(rm),
+               "--radii", ",".join(map(str, radii)), "--debug", f"{i},{k}"]
+        if arm != "spawn":
+            cmd += ["--origin", g["origin"]]
+        out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.splitlines()
+        _, sx, sz, sang = out[0].split()
+        px, pz, ang = float(sx), float(sz), float(sang)
+        Cm = np.array([[float(v) for v in l.split(",")] for l in out[1:]])
+        qx, qz, bio, Dc = Cm[:, 0].astype(int), Cm[:, 1].astype(int), Cm[:, 2].astype(int), Cm[:, 3:]
+        for j, r in enumerate(radii):
+            Dp = th.cell_D(px, pz, ang, qx, qz, float(r), cap=float(rm))
+            fin = Dc[:, j] >= 0
+            if (np.isfinite(Dp) != fin).any():
+                st["max_abs_D_err"] = math.inf
+            else:
+                st["max_abs_D_err"] = max(st["max_abs_D_err"], float(np.max(np.abs(Dp[fin] - Dc[fin, j]), initial=0)))
+            want = {}
+            for b, d in zip(bio[fin], Dc[fin, j]):
+                di = int(math.floor(d + 0.5)); want[int(b)] = min(want.get(int(b), di), di)
+            rr = rows[(rows[:, 4] == r) & (rows[:, 2] != REACH)]
+            got = {int(b): int(d) for b, d in rr[:, [2, 3]]}
+            rho = reach[int(r)]
+            for b in set(want) | set(got):
+                w, gv = want.get(b), got.get(b)
+                if (w is not None and w <= rho) or (gv is not None and gv <= rho):
+                    st["rows_checked"] += 1; st["rows_mismatch"] += int(w != gv)
+        st["rays_checked"] += 1; st["cells_checked"] += int(Cm.shape[0])
+    return st
 
 
 # ------------------------------------------------------------------ CLI
@@ -329,11 +452,12 @@ def main(argv=None):
     ap.add_argument("--pilot-seeds", type=int, default=200)
     ap.add_argument("--radii", default="0,64,128")
     ap.add_argument("--rays", type=int, default=4)
-    ap.add_argument("--target", type=float, default=0.05)
+    ap.add_argument("--target", default="0:0.05,64:0.10,128:0.10", help="radius:relative half width,...")
+    ap.add_argument("--cap-mult", type=float, default=4.0)
+    ap.add_argument("--uniform-radii", default="0")
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--alpha-rest", type=float, default=0.005)
-    ap.add_argument("--tail-max", type=float, default=0.05)
-    ap.add_argument("--target-biomes", default=",".join(cr.RARE))
+    ap.add_argument("--target-biomes", default="auto", help="names, or auto = the 8 rarest in the pilot at each radius")
     ap.add_argument("--chunk", type=int, default=250)
     ap.add_argument("--uniform-L", type=int, default=1_000_000)
     ap.add_argument("--samples", type=int, default=3)
@@ -347,17 +471,19 @@ def main(argv=None):
         radii = [int(x) for x in a.radii.split(",")]
         P = cr.load_csv(os.path.join(a.pilot_dir, "chunk_00000.csv"))
         cr.check_integrity(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii)
-        biomes = sorted(names)
-        plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, biomes, [inv[t] for t in a.target_biomes.split(",")],
-                         a.target, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.tail_max, a.uniform_L)
+        tgt = {int(k): float(v) for k, v in (x.split(":") for x in a.target.split(","))}
+        plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, names, None if a.target_biomes == "auto" else [inv[t] for t in a.target_biomes.split(",")],
+                         tgt, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.cap_mult, a.uniform_L,
+                         tuple(int(x) for x in a.uniform_radii.split(",")))
         lp = os.path.join(ROOT, "out", "certrun", "ledger.json")
         ledger = json.load(open(lp)) if os.path.exists(lp) else []
         nmax = max(plan["n_max"].values())
         cr.check_fresh(a.seed0, nmax, ledger)
-        ledger.append(dict(seed0=a.seed0, n=nmax, purpose=f"certwalk production {plan['hash'][:12]} (all radius groups)"))
+        ledger.append(dict(seed0=a.seed0, n=nmax, purpose=f"certwalk production {plan['hash'][:12]} (both arms)"))
         json.dump(plan, open(pp, "w"), indent=1)
         json.dump(ledger, open(lp, "w"), indent=1)
-        print(json.dumps(dict(caps=plan["caps"], n_star=plan["n_star"], expected_cpu_hours=plan["expected_cpu_s"] / 3600), indent=1))
+        print(json.dumps(dict(cap=plan["cap"], n_star=plan["n_star"], stopset=len(plan["biomes"]),
+                              expected_cpu_hours=plan["expected_cpu_s"] / 3600), indent=1))
         return
     plan = json.load(open(pp))
     if plan.get("hash") != plan_hash(plan):
@@ -371,8 +497,7 @@ def main(argv=None):
         print(open(os.path.join(plan["out"], "report.md")).read())
     else:
         rng = np.random.default_rng()
-        print(json.dumps({f"r{r}_{arm}": cr.verify(group_plan(plan, r, arm), a.samples, rng)
-                          for r in plan["radii"] for arm in ARMS}, indent=1))
+        print(json.dumps({arm: verify(plan, arm, a.samples, rng) for arm in ARMS}, indent=1))
 
 
 if __name__ == "__main__":

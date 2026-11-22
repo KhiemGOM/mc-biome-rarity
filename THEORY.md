@@ -535,3 +535,19 @@ The reported range for each biome is the union of four separately stated parts. 
 **Proposition 21 [P] (rounding folds into the interval).** If every stored distance $\tilde D$ satisfies $\lvert \tilde D - D \rvert \le \frac12$, then $\lvert \mathbb E\min(\tilde D, C) - \mathbb E \min(D, C)\rvert \le \frac12$, $P(\tilde D > C)$ and $P(D > C)$ differ only by the mass of $D \in (C - \frac12, C + \frac12]$, and the reported interval widened by $\frac12 + C\cdot P(\lvert D - C\rvert \le \frac12)$ on each side contains the unrounded quantity. *Proof.* 1 Lipschitz property of $\min(\cdot, C)$, and $\mathbf 1\{\tilde D > C\} \neq \mathbf 1\{D > C\}$ only if $\lvert D - C \rvert \le \frac12$. $\square$ The second term is below $10^{-4}$ relative for every target (the density of $D$ at $C$ is at most $1/\mathbb E[D]$ scale), and the report adds the $\frac12$ block explicitly.
 
 Each number is reported as $\hat\mu\ \pm\ \varepsilon$ with $\varepsilon = \max(\hat\mu - \ell, u - \hat\mu)$, plus the tail share and the stated $\delta$. Two biomes are **ordered** only if their ranges do not overlap; otherwise they are reported as **tied**.
+
+### 8.7 Early stop and one pass for all radii (exact)
+
+`discexact --stopset B` scans each ray in segments of 1,024 blocks by the cell centre projection $t_c = \langle c - p, u\rangle$ and drops a radius as soon as it cannot change any answer for the biomes in $B$.
+
+**Lemma 22a [P].** For every cell $Q$ with centre $c$ and every $r \ge 0$, $D(Q, r) \ge t_c - 2\sqrt2$.
+
+*Proof.* Every $y \in Q$ has $\lvert\langle y - c, u\rangle\rvert \le 2\sqrt 2$ (half diagonal). If $D = \operatorname{dist}(p, Q) \le r$, then $D = \lvert y^* - p\rvert \ge \langle y^* - p, u\rangle \ge t_c - 2\sqrt2$ for the nearest $y^*$. Otherwise $D = s + r$ with $\lvert p + s u - y\rvert \le r$ for some $y \in Q$, so $s \ge \langle y - p, u\rangle - r \ge t_c - 2\sqrt 2 - r$ and $D \ge t_c - 2\sqrt 2$. $\square$ Test: `test_lemma_cell_D_at_least_centre_projection_minus_2sqrt2`.
+
+**Proposition 22 [P].** After all cells with $t_c < T$ are processed, let $\rho = \min(T - 3, C)$. If $\rho = C$, or every $b \in B$ already has a cell with $D \le \rho$, stop that radius and record $\rho$. Then for every biome $b$ (in $B$ or not), the recorded minimum equals the full scan minimum whenever either is $\le \rho$; and for $b \in B$ a missing row means $D_b > C$.
+
+*Proof.* Unprocessed cells have $t_c \ge T$, so $D \ge T - 2\sqrt2 > \rho$ by Lemma 22a: they cannot lower any minimum that is $\le \rho$. Each processed cell's $D$ is computed from the ray's own origin and the full cap, so processed values equal the full scan's. If the radius stopped with $\rho < C$, every $b \in B$ was found with $D \le \rho$, so a missing $b \in B$ only happens when $\rho = C$, i.e. no cell with $D \le C$ exists. $\square$ Checked on data by `certwalk.check_reach` and by `verify` (a full scan up to the reach). Equality with the full scan: `test_early_stop_rows_equal_full_scan_within_reach` and 22,268 rows on 160 production like rays with 0 mismatches.
+
+So the statistics of section 8.2 computed from the rows are exactly those of the full scan for every biome in $B$, which is every biome seen in the pilot. A biome outside $B$ would only get rows that are exact up to $\rho$; none is reported. All radii run in one pass (the widest still active radius sets the strip), and radii drop out of later chunks by the predictable rule of Theorem 20, so each radius uses a prefix of the seeds.
+
+**Cost (measured on 48 rays, cap 540,000, all three radii):** mean reach 255k / 158k / 138k blocks for $r = 0 / 64 / 128$, 9.1 s per ray on one cloud core, against 20 s for full caps run separately.

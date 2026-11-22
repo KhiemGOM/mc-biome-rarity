@@ -104,13 +104,18 @@ static double cell_D(double px, double pz, double ux, double uz, double x0, doub
 // ---- one ray --------------------------------------------------------------------------------------------------
 typedef void (*emit_fn)(void *ctx, int qx, int qz, int biome, const double *D);
 
-static void scan_ray(const Generator *g, double px, double pz, double ang, const double *radii, int nr, long rmax, emit_fn emit, void *ctx) {
-    double ux = cos(ang), uz = sin(ang), rr = 0;
-    for (int i = 0; i < nr; i++) if (radii[i] > rr) rr = radii[i];
+// Enumerate the cells within the active radii (+ margin) of the sub-segment [sa, sb] of the ray, keep those whose centre
+// projection t_c = <c - p, u> lies in [tlo, thi), and emit their D (computed from the ray's own origin and the full cap,
+// so values are identical to a single full scan). act[i] = 0 marks a radius that is no longer needed (D[i] = -1).
+static void scan_core(const Generator *g, double px, double pz, double ux, double uz, double sa, double sb, double tlo,
+                      double thi, const double *radii, const int *act, int nr, long rmax, emit_fn emit, void *ctx) {
+    double rr = -1;
+    for (int i = 0; i < nr; i++) if (act[i] && radii[i] > rr) rr = radii[i];
+    if (rr < 0) return;
     double m = rr + 6.0;
-    double ex = px + rmax * ux, ez = pz + rmax * uz;
-    int qxa = (int)floor((fmin(px, ex) - m) / 4.0), qxb = (int)floor((fmax(px, ex) + m) / 4.0);
-    double zbl = fmin(pz, ez) - m, zbh = fmax(pz, ez) + m;
+    double ax = px + sa * ux, az = pz + sa * uz, ex = px + sb * ux, ez = pz + sb * uz;
+    int qxa = (int)floor((fmin(ax, ex) - m) / 4.0), qxb = (int)floor((fmax(ax, ex) + m) / 4.0);
+    double zbl = fmin(az, ez) - m, zbh = fmax(az, ez) + m;
     for (int qx = qxa; qx <= qxb; qx++) {
         double zl = zbl, zh = zbh;
         if (fabs(ux) > 1e-9) {
@@ -126,15 +131,25 @@ static void scan_ray(const Generator *g, double px, double pz, double ang, const
         int qza = (int)floor(zl / 4.0), qzb = (int)floor(zh / 4.0);
         for (int qz = qza; qz <= qzb; qz++) {
             double x0 = 4.0 * qx - 0.5, x1 = x0 + 4.0, z0 = 4.0 * qz - 0.5, z1 = z0 + 4.0;   // block i spans [i-0.5, i+0.5]: cells tile the plane
+            double tc = (x0 + 2.0 - px) * ux + (z0 + 2.0 - pz) * uz;
+            if (tc < tlo || tc >= thi) continue;
             double D[MAXR]; int any = 0;
-            for (int i = 0; i < nr; i++) { D[i] = cell_D(px, pz, ux, uz, x0, x1, z0, z1, radii[i], (double)rmax); if (D[i] >= 0) any = 1; }
+            for (int i = 0; i < nr; i++) {
+                D[i] = act[i] ? cell_D(px, pz, ux, uz, x0, x1, z0, z1, radii[i], (double)rmax) : -1.0;
+                if (D[i] >= 0) any = 1;
+            }
             if (!any) continue;
             emit(ctx, qx, qz, surface_only(g, qx, qz), D);
         }
     }
 }
 
-typedef struct { int nr; int fm[NLEV][MAXR][256]; } Acc;
+static void scan_ray(const Generator *g, double px, double pz, double ang, const double *radii, int nr, long rmax, emit_fn emit, void *ctx) {
+    int act[MAXR]; for (int i = 0; i < MAXR; i++) act[i] = 1;
+    scan_core(g, px, pz, cos(ang), sin(ang), 0.0, (double)rmax, -1e300, 1e300, radii, act, nr, rmax, emit, ctx);
+}
+
+typedef struct { int nr; int fm[NLEV][MAXR][256]; double dm[MAXR][256]; } Acc;
 
 static void emit_min(void *ctx, int qx, int qz, int biome, const double *D) {
     Acc *a = (Acc *)ctx;
@@ -146,10 +161,14 @@ static void emit_min(void *ctx, int qx, int qz, int biome, const double *D) {
             if (D[i] < 0) continue;
             int di = (int)floor(D[i] + 0.5);
             if (a->fm[l][i][biome] < 0 || di < a->fm[l][i][biome]) a->fm[l][i][biome] = di;
+            if (l == 0 && (a->dm[i][biome] < 0 || D[i] < a->dm[i][biome])) a->dm[i][biome] = D[i];
         }
     }
 }
 
+static int NSTOP = 0, STOPSET[256];   /* early stop set (THEORY.md 8.7); 0 = full scan to the cap */
+#define SEG 1024.0
+#define REACH_BIOME 256                /* row marker: dist = reach, every biome row with dist <= reach is exact */
 static long ORIGIN_L = 0;          /* 0: spawn (estimateSpawn). L > 0: uniform cell-centre start in [-L, L]^2 */
 
 /* Start point. The uniform start uses its own splitmix stream of the seed, independent of the angle stream. */
@@ -176,8 +195,45 @@ static void *worker(void *arg) {
             double ang = 2.0 * M_PI * ((double)k + u) / (double)j->rays;
             Acc a; a.nr = j->nr;
             memset(a.fm, 0xff, sizeof a.fm);
-            scan_ray(&g, (double)sp.x, (double)sp.z, ang, j->radii, j->nr, j->rmax, emit_min, &a);
-            for (int l = 0; l < NLEV; l++)
+            for (int r = 0; r < MAXR; r++) for (int b = 0; b < 256; b++) a.dm[r][b] = -1.0;
+            double reach[MAXR];
+            if (!NSTOP) {
+                scan_ray(&g, (double)sp.x, (double)sp.z, ang, j->radii, j->nr, j->rmax, emit_min, &a);
+                for (int r = 0; r < j->nr; r++) reach[r] = (double)j->rmax;
+            } else {
+                // Segments of the ray by centre projection. Lemma (THEORY.md 8.7): an unscanned cell with t_c >= T has
+                // D >= T - 2*sqrt(2) > T - 3, so a radius is finished once T - 3 >= cap or every stop set biome has
+                // min D <= T - 3. Its rows are then exactly those of the full scan for every biome with D <= T - 3.
+                double ux = cos(ang), uz = sin(ang);
+                int act[MAXR], nact = j->nr;
+                for (int r = 0; r < MAXR; r++) act[r] = r < j->nr;
+                for (int r = 0; r < j->nr; r++) reach[r] = (double)j->rmax;
+                for (long sg = 0; nact > 0; sg++) {
+                    double T = SEG * (double)(sg + 1);
+                    double sa = fmax(0.0, SEG * (double)sg - 8.0), sb = fmin((double)j->rmax, T + 8.0);
+                    if (sb < sa) sb = sa;
+                    scan_core(&g, (double)sp.x, (double)sp.z, ux, uz, sa, sb, sg == 0 ? -1e300 : SEG * (double)sg, T,
+                              j->radii, act, j->nr, j->rmax, emit_min, &a);
+                    for (int r = 0; r < j->nr; r++) {
+                        if (!act[r]) continue;
+                        int done = T - 3.0 >= (double)j->rmax;
+                        if (!done) {
+                            done = 1;
+                            for (int q = 0; q < NSTOP && done; q++) {
+                                double d = a.dm[r][STOPSET[q]];
+                                if (d < 0 || d > T - 3.0) done = 0;
+                            }
+                        }
+                        if (done) { act[r] = 0; nact--; reach[r] = fmin(T - 3.0, (double)j->rmax); }
+                    }
+                }
+            }
+            for (int r = 0; r < j->nr && NSTOP; r++) {
+                int n = snprintf(line, sizeof line, "%lld,%d,%.17g,%d,%ld,%d,%d\n", (long long)(int64_t)seed, k, ang, REACH_BIOME,
+                                 (long)floor(reach[r]), (int)j->radii[r], 1);
+                append(&buf, &len, &cap, line, (size_t)n);
+            }
+            for (int l = 0; l < (NSTOP ? 1 : NLEV); l++)
                 for (int r = 0; r < j->nr; r++)
                     for (int b = 0; b < 256; b++)
                         if (a.fm[l][r][b] >= 0) {
@@ -213,6 +269,13 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "--seed0")) seed0 = strtoull(v, NULL, 10);
         else if (!strcmp(a, "--threads")) threads = atoi(v);
         else if (!strcmp(a, "--out")) out = v;
+        else if (!strcmp(a, "--stopset")) {
+            char t2[2048]; strncpy(t2, v, sizeof t2 - 1); t2[sizeof t2 - 1] = 0; NSTOP = 0;
+            for (char *tok = strtok(t2, ","); tok; tok = strtok(NULL, ",")) {
+                int b = atoi(tok); if (b < 0 || b > 255 || NSTOP >= 256) return bad("--stopset biome ids 0..255"); STOPSET[NSTOP++] = b;
+            }
+            if (!NSTOP) return bad("--stopset empty");
+        }
         else if (!strcmp(a, "--origin")) { if (!strcmp(v, "spawn")) ORIGIN_L = 0; else if (sscanf(v, "uniform:%ld", &ORIGIN_L) != 1 || ORIGIN_L < 1 || ORIGIN_L > 20000000) return bad("--origin spawn|uniform:L"); }
         else if (!strcmp(a, "--debug")) { if (sscanf(v, "%ld,%d", &dbg_i, &dbg_k) != 2) return bad("--debug i,ray"); }
         else return bad("unknown option");

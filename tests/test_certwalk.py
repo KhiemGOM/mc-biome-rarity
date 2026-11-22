@@ -149,37 +149,86 @@ def test_uniform_origin_spreads_over_the_box():
     assert min(xs) < -500 and max(xs) > 500
 
 
+# ---------------------------------------------------------------- early stop (Proposition 22)
+import theory as th
+
+
+def test_lemma_cell_D_at_least_centre_projection_minus_2sqrt2():
+    rng = np.random.default_rng(8)
+    for _ in range(40):
+        px, pz, ang, r = rng.uniform(-50, 50), rng.uniform(-50, 50), rng.uniform(0, 2 * math.pi), float(rng.choice([0, 64, 128]))
+        qx, qz = rng.integers(-300, 300, 4000), rng.integers(-300, 300, 4000)
+        D = th.cell_D(px, pz, ang, qx, qz, r, cap=1e9)
+        tc = (4 * qx + 1.5 - px) * math.cos(ang) + (4 * qz + 1.5 - pz) * math.sin(ang)
+        ok = np.isfinite(D)
+        assert np.all(D[ok] >= tc[ok] - 2 * math.sqrt(2) - 1e-9)
+
+
+@pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
+def test_early_stop_rows_equal_full_scan_within_reach(tmp_path):
+    f, g = str(tmp_path / "f.csv"), str(tmp_path / "g.csv")
+    base = [EXE, "--seeds", "6", "--rays", "2", "--rmax", "12000", "--radii", "0,64", "--seed0", "4242", "--threads", "2"]
+    subprocess.run(base + ["--out", f], check=True)
+    subprocess.run(base + ["--out", g, "--stopset", "1,4,5,7,21,35"], check=True)
+    F = cr.load_csv(f); G = cr.load_csv(g)
+    reach = {(a, b, c): d for a, b, d, c in G[G[:, 2] == cw.REACH][:, [0, 1, 3, 4]].tolist()}
+    assert len(reach) == 6 * 2 * 2
+    full = {(a, b, c, e): d for a, b, c, d, e in F[:, :5].tolist()}
+    seg = {(a, b, c, e): d for a, b, c, d, e in G[G[:, 2] != cw.REACH][:, :5].tolist()}
+    checked = 0
+    for key in set(full) | set(seg):
+        rho = reach[(key[0], key[1], key[3])]
+        if full.get(key, 1e18) <= rho or seg.get(key, 1e18) <= rho:
+            assert full.get(key) == seg.get(key); checked += 1
+    assert checked > 50
+    cw.check_reach(G, 6, 2, [0, 64], [1, 4, 5, 7, 21, 35], 12000)
+
+
+def test_check_reach_rejects_a_ray_that_stopped_without_its_biomes():
+    s = 123
+    rows = [(s, 0, cw.REACH, 5000, 0, 1), (s, 0, 1, 100, 0, 1), (s, 0, 4, 4000, 0, 1)]
+    A = np.array(rows, dtype=np.int64)
+    cw.check_reach(A, 1, 1, [0], [1, 4], 20000)
+    with pytest.raises(ValueError, match="stopped early"):
+        cw.check_reach(A, 1, 1, [0], [1, 4, 5], 20000)
+    with pytest.raises(ValueError, match="reach rows"):
+        cw.check_reach(A[1:], 1, 1, [0], [1, 4], 20000)
+
+
 # ---------------------------------------------------------------- end to end
 def tiny_plan(tmp_path):
-    biomes = list(range(256))
+    biomes = [1, 4, 5, 7, 21, 35]
     rng = np.random.default_rng(0)
-    pr = cw._sim_priors(2000.0, 3000, 2, rng, n=500)
-    plan = dict(seed0=9_200_000_000, rays=2, radii=[0, 64], caps={"0": 3000, "64": 3000}, chunk=2, alpha=0.05,
-                alpha_rest=0.0, biomes=biomes, target_biomes=[1], target=0.001, uniform_L=1_000_000,
-                alpha_each={cw.qkey(b, r): 0.05 / (cw.SEQS * 512) for b in biomes for r in (0, 64)},
-                priors={cw.qkey(b, r): pr for b in biomes for r in (0, 64)}, n_star={"0": 4, "64": 4},
-                n_max={"0": 4, "64": 2}, out=str(tmp_path), threads=2)
+    pr = cw._sim_priors(2000.0, 6000, 2, rng, n=500)
+    radii = [0, 64]
+    plan = dict(seed0=9_200_000_000, rays=2, radii=radii, cap=6000, caps={"0": 6000, "64": 6000}, chunk=2, alpha=0.05,
+                alpha_rest=0.0, biomes=biomes, target_biomes=[1], target={"0": 0.001, "64": 0.001}, uniform_L=1_000_000,
+                alpha_each={cw.qkey(b, r): 0.05 / (cw.SEQS * 12) for b in biomes for r in radii},
+                priors={cw.qkey(b, r): pr for b in biomes for r in radii}, n_star={"0": 4, "64": 4},
+                n_max={"0": 6, "64": 2}, arm_radii={"spawn": radii, "uniform": [0]}, out=str(tmp_path), threads=2)
     return plan
 
 
 @pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
-def test_end_to_end_two_arms(tmp_path):
+def test_end_to_end_one_pass_two_arms(tmp_path):
     plan = tiny_plan(tmp_path)
     cw.run(plan, log=lambda *a: None)
-    for r, n in ((0, 4), (64, 2)):
-        for arm in cw.ARMS:
-            man = cr.load_manifest(cw.group_plan(plan, r, arm))
-            assert sum(c["n"] for c in man) == n
+    ms = cr.load_manifest(cw.arm_plan(plan, "spawn")); mu = cr.load_manifest(cw.arm_plan(plan, "uniform"))
+    assert [c["radii"] for c in ms] == [[0, 64], [0], [0]] and [c["radii"] for c in mu] == [[0], [0], [0]]
     cert = cw.report(plan)
-    seeds = {x["radius"]: x["seeds"] for x in cert["results"]}
-    assert seeds == {0: 4, 64: 2}
+    seeds = {(x["radius"]): x["seeds"] for x in cert["results"]}
+    assert seeds == {0: 6, 64: 2}
     for x in cert["results"]:
         assert x["A_lo"] <= x["A"] <= x["A_hi"] and x["ED_lower_no_assumption"] <= x["ED"]
-        assert x["bias_A_lo"] <= x["bias_A"] <= x["bias_A_hi"]
-    v = cr.verify(cw.group_plan(plan, 0, "uniform"), samples=2, rng=np.random.default_rng(0))
-    assert v["missing_cells"] == 0 and v["rows_mismatch"] == 0 and v["max_abs_D_err"] < 1e-4
+        if x["radius"] == 0:
+            assert x["bias_A_lo"] <= x["bias_A"] <= x["bias_A_hi"]
+        else:
+            assert "uniform" not in x
+    for arm in cw.ARMS:
+        v = cw.verify(plan, arm, samples=2, rng=np.random.default_rng(0))
+        assert v["rows_mismatch"] == 0 and v["rows_checked"] > 5 and v["max_abs_D_err"] < 1e-4
     cw.run(plan, log=lambda *a: None)                                  # resumable: nothing new
-    assert sum(c["n"] for c in cr.load_manifest(cw.group_plan(plan, 0, "spawn"))) == 4
+    assert len(cr.load_manifest(cw.arm_plan(plan, "spawn"))) == 3
 
 
 def test_ties_where_ranges_overlap():
