@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CUBI = os.environ.get("CUBIOMES", os.path.expanduser("~/cubiomes-xp"))
 LIB = os.path.join(CUBI, "libcubiomes.a")
 pytestmark = pytest.mark.skipif(not os.path.exists(LIB), reason="needs a built Cubiomes (./build.sh)")
-FLAGS = ["-O3", "-fwrapv", f"-I{CUBI}"]
+FLAGS = ["-O3", "-fwrapv", "-ffp-contract=off", "-fno-fast-math", f"-I{CUBI}"]
 
 
 def _cc(out, src, *extra):

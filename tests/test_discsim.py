@@ -32,7 +32,7 @@ def test_header_and_modes():
 def test_centerline_mode_equals_colsim_step16():
     p, o = run_disc(seeds=8, rays=3, rmax=4000)
     d = tempfile.mkdtemp(); s, c = os.path.join(d, "s"), os.path.join(d, "c")
-    q = subprocess.run([COLSIM, "--mc", "1.21", "--seeds", "8", "--rays", "3", "--rmax", "4000", "--step", "16",
+    q = subprocess.run([COLSIM, "--mc", "26.3", "--seeds", "8", "--rays", "3", "--rmax", "4000", "--step", "16",
                         "--seed0", "1", "--no-column", "--out-surface", s, "--out-column", c], capture_output=True, text=True)
     assert q.returncode == 0
     a = sorted((x["seed"], x["ray"], x["biome"], x["dist"]) for x in rows(o) if x["mode"] == 0)

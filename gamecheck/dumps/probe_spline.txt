@@ -1,0 +1,507 @@
+M minecraft:overworld/continents 10
+ P bf8ccccd 00000000
+  C 3d343958
+ P bf828f5c 00000000
+  C be638866
+ P bf028f5c 00000000
+  C be638866
+ P bee147ae 00000000
+  C bdf5c28f
+ P be3851ec 00000000
+  C bdf5c28f
+ P be23d70a 00000000
+  M minecraft:overworld/erosion 7
+   P bf59999a 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec75f90
+      C bdb5ddc0
+     P 3f800000 3ec75f90
+      C 3f30a3d8
+   P bf333333 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec17984
+      C bded13c4
+     P 3f800000 3ec17984
+      C 3f23d70c
+   P becccccd 00000000
+    M minecraft:overworld/ridges_folded 6
+     P bf800000 00000000
+      C be638866
+     P bf400000 00000000
+      C be638866
+     P bf266666 00000000
+      C 00000000
+     P 3f186fb8 00000000
+      C 33000000
+     P 3f1aff14 3e81c506
+      C 33000000
+     P 3f800000 3e81c506
+      C 3dccccd0
+   P beb33333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be99999a
+     P becccccd 00000000
+      C 3d4ccccd
+     P 00000000 00000000
+      C 3d4ccccd
+     P 3ecccccd 00000000
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P bdcccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be19999a
+     P becccccd 00000000
+      C 00000000
+     P 00000000 00000000
+      C 00000000
+     P 3ecccccd 3dcccccd
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P 3e4ccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be19999a
+     P becccccd 00000000
+      C 00000000
+     P 00000000 00000000
+      C 00000000
+     P 3ecccccd 00000000
+      C 00000000
+     P 3f800000 00000000
+      C 00000000
+   P 3f333333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 00000000
+      C bca3d70a
+     P becccccd 00000000
+      C bcf5c28f
+     P 00000000 00000000
+      C bcf5c28f
+     P 3ecccccd 3d75c28f
+      C 00000000
+     P 3f800000 00000000
+      C 00000000
+ P be19999a 00000000
+  M minecraft:overworld/erosion 7
+   P bf59999a 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec75f90
+      C bdb5ddc0
+     P 3f800000 3ec75f90
+      C 3f30a3d8
+   P bf333333 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec17984
+      C bded13c4
+     P 3f800000 3ec17984
+      C 3f23d70c
+   P becccccd 00000000
+    M minecraft:overworld/ridges_folded 6
+     P bf800000 00000000
+      C be638866
+     P bf400000 00000000
+      C be638866
+     P bf266666 00000000
+      C 00000000
+     P 3f186fb8 00000000
+      C 33000000
+     P 3f1aff14 3e81c506
+      C 33000000
+     P 3f800000 3e81c506
+      C 3dccccd0
+   P beb33333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be99999a
+     P becccccd 00000000
+      C 3d4ccccd
+     P 00000000 00000000
+      C 3d4ccccd
+     P 3ecccccd 00000000
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P bdcccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be19999a
+     P becccccd 00000000
+      C 00000000
+     P 00000000 00000000
+      C 00000000
+     P 3ecccccd 3dcccccd
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P 3e4ccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be19999a
+     P becccccd 00000000
+      C 00000000
+     P 00000000 00000000
+      C 00000000
+     P 3ecccccd 00000000
+      C 00000000
+     P 3f800000 00000000
+      C 00000000
+   P 3f333333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 00000000
+      C bca3d70a
+     P becccccd 00000000
+      C bcf5c28f
+     P 00000000 00000000
+      C bcf5c28f
+     P 3ecccccd 3d75c28f
+      C 00000000
+     P 3f800000 00000000
+      C 00000000
+ P bdcccccd 00000000
+  M minecraft:overworld/erosion 7
+   P bf59999a 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec75f90
+      C bdb5ddc0
+     P 3f800000 3ec75f90
+      C 3f30a3d8
+   P bf333333 00000000
+    M minecraft:overworld/ridges_folded 2
+     P bf800000 3ec17984
+      C bded13c4
+     P 3f800000 3ec17984
+      C 3f23d70c
+   P becccccd 00000000
+    M minecraft:overworld/ridges_folded 6
+     P bf800000 00000000
+      C be638866
+     P bf400000 00000000
+      C be638866
+     P bf266666 00000000
+      C 00000000
+     P 3f186fb8 00000000
+      C 33000000
+     P 3f1aff14 3e81c506
+      C 33000000
+     P 3f800000 3e81c506
+      C 3dccccd0
+   P beb33333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be800000
+     P becccccd 00000000
+      C 3d4ccccd
+     P 00000000 00000000
+      C 3d4ccccd
+     P 3ecccccd 00000000
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P bdcccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 3c23d70a
+      C 3a83126f
+     P 00000000 3c23d70a
+      C 3b449ba6
+     P 3ecccccd 3dc08313
+      C 3d4ccccd
+     P 3f800000 3be56044
+      C 3d75c290
+   P 3e4ccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3f333333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 00000000
+      C bca3d70a
+     P becccccd 00000000
+      C bcf5c28f
+     P 00000000 00000000
+      C bcf5c28f
+     P 3ecccccd 3df5c28f
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+ P 3e800000 00000000
+  M minecraft:overworld/erosion 11
+   P bf59999a 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3e4f34e5
+     P 00000000 3f038a07
+      C 3f375740
+     P 3f800000 3f038a07
+      C 3f9d70a4
+   P bf333333 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3e4ccccd
+     P 00000000 3eddc9bc
+      C 3ee4c5a0
+     P 3f800000 3eddc9bc
+      C 3f6147ae
+   P becccccd 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3e4ccccd
+     P 00000000 3ec88d92
+      C 3e9dd8d6
+     P 3f800000 3ec88d92
+      C 3f333334
+   P beb33333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be800000
+     P becccccd 00000000
+      C 3eb33333
+     P 00000000 00000000
+      C 3eb33333
+     P 3ecccccd 00000000
+      C 3eb33333
+     P 3f800000 3d48b43d
+      C 3ed70a3e
+   P bdcccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 3d8f5c29
+      C 3be56041
+     P 00000000 3d8f5c29
+      C 3cac0831
+     P 3ecccccd 3f2872b0
+      C 3eb33333
+     P 3f800000 3d48b43d
+      C 3ed70a3e
+   P 3e4ccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3ecccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3ee66666 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C bdcccccd
+     P becccccd 00000000
+      M minecraft:overworld/ridges_folded 5
+       P bf800000 3f000000
+        C bdcccccd
+       P becccccd 00000000
+        C 3c23d70a
+       P 00000000 00000000
+        C 3c23d70a
+       P 3ecccccd 3d23d70a
+        C 3cf5c28f
+       P 3f800000 3d48b439
+        C 3dcccccd
+     P 00000000 00000000
+      C 3e2e147b
+   P 3f0ccccd 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C bdcccccd
+     P becccccd 00000000
+      M minecraft:overworld/ridges_folded 5
+       P bf800000 3f000000
+        C bdcccccd
+       P becccccd 00000000
+        C 3c23d70a
+       P 00000000 00000000
+        C 3c23d70a
+       P 3ecccccd 3d23d70a
+        C 3cf5c28f
+       P 3f800000 3d48b439
+        C 3dcccccd
+     P 00000000 00000000
+      C 3e2e147b
+   P 3f147ae1 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bdcccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3f333333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 00000000
+      C bca3d70a
+     P becccccd 00000000
+      C bcf5c28f
+     P 00000000 00000000
+      C bcf5c28f
+     P 3ecccccd 3df5c28f
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+ P 3f800000 00000000
+  M minecraft:overworld/erosion 11
+   P bf59999a 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3eb22364
+     P 00000000 3f137727
+      C 3f6c88d9
+     P 3f800000 3f137727
+      C 3fc00000
+   P bf333333 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3e4ccccd
+     P 00000000 3eebf1d8
+      C 3f0a0714
+     P 3f800000 3eebf1d8
+      C 3f800000
+   P becccccd 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C 3e4ccccd
+     P 00000000 3eebf1d8
+      C 3f0a0714
+     P 3f800000 3eebf1d8
+      C 3f800000
+   P beb33333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C be4ccccd
+     P becccccd 00000000
+      C 3f000000
+     P 00000000 00000000
+      C 3f000000
+     P 3ecccccd 00000000
+      C 3f000000
+     P 3f800000 3d8f5c2b
+      C 3f19999a
+   P bdcccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bd4ccccd
+     P becccccd 3dcccccc
+      C 3c23d70a
+     P 00000000 3dcccccc
+      C 3cf5c28f
+     P 3ecccccd 3f70a3d7
+      C 3f000000
+     P 3f800000 3d8f5c2b
+      C 3f19999a
+   P 3e4ccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bd4ccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3ecccccd 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bd4ccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3ee66666 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C bd4ccccd
+     P becccccd 00000000
+      M minecraft:overworld/ridges_folded 5
+       P bf800000 3f000000
+        C bd4ccccd
+       P becccccd 00000000
+        C 3c23d70a
+       P 00000000 00000000
+        C 3c23d70a
+       P 3ecccccd 3d23d70a
+        C 3cf5c28f
+       P 3f800000 3d48b439
+        C 3dcccccd
+     P 00000000 00000000
+      C 3e2e147b
+   P 3f0ccccd 00000000
+    M minecraft:overworld/ridges_folded 3
+     P bf800000 00000000
+      C bd4ccccd
+     P becccccd 00000000
+      M minecraft:overworld/ridges_folded 5
+       P bf800000 3f000000
+        C bd4ccccd
+       P becccccd 00000000
+        C 3c23d70a
+       P 00000000 00000000
+        C 3c23d70a
+       P 3ecccccd 3d23d70a
+        C 3cf5c28f
+       P 3f800000 3d48b439
+        C 3dcccccd
+     P 00000000 00000000
+      C 3e2e147b
+   P 3f147ae1 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3f000000
+      C bd4ccccd
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd
+   P 3f333333 00000000
+    M minecraft:overworld/ridges_folded 5
+     P bf800000 3c75c28f
+      C bca3d70a
+     P becccccd 00000000
+      C 3c23d70a
+     P 00000000 00000000
+      C 3c23d70a
+     P 3ecccccd 3d23d70a
+      C 3cf5c28f
+     P 3f800000 3d48b439
+      C 3dcccccd

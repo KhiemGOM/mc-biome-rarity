@@ -13,7 +13,7 @@ cmake --build "$CUBI/build" -j"$(nproc)" --target cubiomes_static cubiomes > /de
 cp "$CUBI/build/libcubiomes_static.a" "$CUBI/libcubiomes.a"
 cp "$CUBI/build/libcubiomes.so" "$CUBI/libcubiomes.so"   # used only by tests/test_raysim.py (ctypes oracle)
 for p in raysim colsim discsim discexact mapdump; do
-  gcc -O3 -fwrapv -I"$CUBI" -o "$p" "$p.c" "$CUBI/libcubiomes.a" -lm -pthread
+  gcc -O3 -fwrapv -ffp-contract=off -fno-fast-math -I"$CUBI" -o "$p" "$p.c" "$CUBI/libcubiomes.a" -lm -pthread
 done
 echo "built. Cubiomes at $CUBI ($(git -C "$CUBI" rev-parse --short HEAD))"
 if [ "$CUBI" != "$HOME/cubiomes-xp" ]; then

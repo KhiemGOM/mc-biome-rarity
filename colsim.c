@@ -11,6 +11,7 @@
 #include "biomenoise.h"
 #include "finders.h"
 #include "generator.h"
+#include "c263world.h"   // --mc 26.3: bit-exact 26.3 climate and spawn (c263climate.h)
 #include "util.h"
 
 #define QY_MIN (-16)
@@ -35,14 +36,17 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
 }
 
 // Fill layer[0..NL) with biome ids for the column at quart (qx,qz); return surface layer index in *surf.
-static void column(const Generator *g, int qx, int qz, int *layer, int *depth_out, int *surf, uint64_t *dat) {
+static void column(const World *w, int qx, int qz, int *layer, int *depth_out, int *surf, uint64_t *dat) {
+    const Generator *g = &w->g;
     int64_t np[6];
-    sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
+    float off = 0;
+    if (w->is263) { off = c263_column(&w->c, qx, qz, np); np[4] = c263_depth_at(off, QY_REF); }   // 26.3: exact depth per layer
+    else world_np(w, qx, QY_REF, qz, np);
     double dref = (double)np[4] / 10000.0;
     for (int i = 0; i < NL; i++) {
         int qy = QY_MIN + i;
         float d = (float)(dref + (double)(QY_REF - qy) / 32.0);
-        np[4] = (int64_t)(10000.0F * d);
+        np[4] = w->is263 ? c263_depth_at(off, qy) : (int64_t)(10000.0F * d);
         if (depth_out) depth_out[i] = (int)np[4];
         layer[i] = climateToBiome(g->mc, (const uint64_t *)np, dat);
     }
@@ -56,30 +60,33 @@ static void column(const Generator *g, int qx, int qz, int *layer, int *depth_ou
 // Surface biome only: one climate sample, one table lookup (same arithmetic as column()).
 // Hint-free lookup on purpose: with a hint, exact distance ties resolve to the previous sample's biome, so the
 // result would depend on the path. Hint-free is deterministic per point (costs ~15% time).
-static int surface_only(const Generator *g, int qx, int qz, uint64_t *dat) {
+static int surface_only(const World *w, int qx, int qz, uint64_t *dat) {
+    const Generator *g = &w->g;
     int64_t np[6];
-    sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
+    float off = 0;
+    if (w->is263) { off = c263_column(&w->c, qx, qz, np); np[4] = c263_depth_at(off, QY_REF); }
+    else world_np(w, qx, QY_REF, qz, np);
     double dref = (double)np[4] / 10000.0;
     int qs = (int)floor(QY_REF + 32.0 * dref + 0.5);
     if (qs < QY_MIN) qs = QY_MIN;
     if (qs > QY_MAX) qs = QY_MAX;
     float d = (float)(dref + (double)(QY_REF - qs) / 32.0);
-    np[4] = (int64_t)(10000.0F * d);
+    np[4] = w->is263 ? c263_depth_at(off, qs) : (int64_t)(10000.0F * d);   // 26.3: the exact depth of the surface layer
     (void)dat; return climateToBiome(g->mc, (const uint64_t *)np, NULL);
 }
 
 static void *worker(void *arg) {
     Job *j = (Job *)arg;
-    Generator g;
-    setupGenerator(&g, j->mc, 0);
+    World w;
+    world_setup(&w, j->mc);
     uint64_t dat = 0;
     for (long i = j->tid; i < j->seeds; i += j->nthreads) {
         uint64_t st = j->seed0 + (uint64_t)i;
         uint64_t seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL;
         double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
-        applySeed(&g, 0, seed);
-        Pos sp = estimateSpawn(&g, NULL);
+        world_seed(&w, seed);
+        Pos sp = world_spawn(&w);
         char *sb = NULL, *cb = NULL; size_t sl = 0, sc = 0, cl = 0, cc = 0; char line[128];
         for (int k = 0; k < j->rays; k++) {
             double ang = 2.0 * M_PI * ((double)k + u) / (double)j->rays;
@@ -94,8 +101,8 @@ static void *worker(void *arg) {
                 int x = sp.x + (int)floor((double)r * ca + 0.5);
                 int z = sp.z + (int)floor((double)r * sa + 0.5);
                 int sbio;
-                if (j->nocol) sbio = surface_only(&g, x >> 2, z >> 2, &dat);
-                else { column(&g, x >> 2, z >> 2, layer, NULL, &surf, &dat); sbio = layer[surf]; }
+                if (j->nocol) sbio = surface_only(&w, x >> 2, z >> 2, &dat);
+                else { column(&w, x >> 2, z >> 2, layer, NULL, &surf, &dat); sbio = layer[surf]; }
                 if (sbio >= 0 && sbio < 256 && fs[sbio] < 0) fs[sbio] = (int)r;
                 if (j->nested > 0) {
                     // sample idx lies on level m's grid exactly when idx is a multiple of 2^m
@@ -136,13 +143,13 @@ static void *worker(void *arg) {
 static int bad(const char *m) { fprintf(stderr, "colsim: %s\n", m); return 2; }
 
 static int do_probe(int mc, long long seed, int qx, int qz) {
-    Generator g; setupGenerator(&g, mc, 0); applySeed(&g, 0, (uint64_t)seed);
+    World w; world_setup(&w, mc); world_seed(&w, (uint64_t)seed);
     int layer[NL], dep[NL], surf; uint64_t dat = 0;
-    column(&g, qx, qz, layer, dep, &surf, &dat);
+    column(&w, qx, qz, layer, dep, &surf, &dat);
     printf("# qy,depth_x10000,biome_reconstructed,biome_game,surface_qy\n");
     for (int i = 0; i < NL; i++) {
         int qy = QY_MIN + i;
-        int game = getBiomeAt(&g, 4, qx, qy, qz);
+        int game = world_biome(&w, qx, qy, qz);
         printf("%d,%d,%d,%d,%d\n", qy, dep[i], layer[i], game, QY_MIN + surf);
     }
     return 0;

@@ -45,3 +45,20 @@ N BIOME dripstone_caves desert desert i4 1 | seed 3890895695060983067 q -241684 
 N BIOME river cold_ocean river i4 1 | seed -4888003033464814834 q 103374 37 113262
 N BIOME dripstone_caves dark_forest dark_forest i4 1 | seed -3002160169930601164 q 347 13 416
 (Where the third column differs from the game's, our tree on the game's exact point still disagrees, which by the T result is a tie.)
+
+==== After the port (c263climate.h for climate and spawn, fork btree263 hint-free for biomes) ====
+GameCheck 200 5000 2000000 1 (point path), GameCheck V 50 20 5 (real chunk path, 1,536,000 cells), SpawnDump 500 7:
+N checked 1000000 np_mismatch 0 biome_mismatch 200 exact_ties 200 tie_rate 0.0002
+V checked 1536000 np_mismatch 0 biome_mismatch 596 exact_ties 596 tie_rate 0.000388
+T checked 2000000 biome_mismatch 955 exact_ties 955
+S checked 200 spawn_mismatch 0
+S checked 500 spawn_mismatch 0          (spawn500)
+Java only, before porting: GameCheck V 20 20 3: volume (createResolverForChunk) vs point climate mismatch 0 of 614,400 cells, biome mismatch 0.
+Piece by piece (c263probe.c vs Probe.java dumps, seeds 12345, 0, -1, 1, -7995527694508729151, 2^63-1): every Perlin layer
+(offsets, permutation, frequency, amplitude) 46/46 per seed and 35,000 points x 10 functions (shift_x, shift_z, t, h, c, e,
+ridges, ridges_folded, offset, depth) identical to the bit.
+Spawn: the radial search's (angle, radius) sequence is seed independent; glibc sin/cos differ from Java's Math.sin/cos in
+the last bit for 10/3 of the 927 angles but never in the integer offsets, which are tabulated from Java (SinCos.java).
+Most frequent tie pairs (ours/game): point path lush_caves/dripstone_caves 824 (T), lukewarm_ocean/ocean 19,
+deep_frozen_ocean/deep_cold_ocean 18, plains/forest 15, frozen_ocean/cold_ocean 12, deep_frozen_ocean/mushroom_fields 11;
+chunk path beach/bamboo_jungle 166, ocean/cold_ocean 96, plains/savanna 96, warm_ocean/desert 96, plains/forest 93.

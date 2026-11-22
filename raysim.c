@@ -11,6 +11,7 @@
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
+#include "c263world.h"   // --mc 26.3: bit-exact 26.3 climate and spawn (c263climate.h)
 
 typedef struct { char *first; size_t nfirst; char *far; size_t nfar; } SeedOut;
 
@@ -40,15 +41,15 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
 
 static void *worker(void *arg) {
     Job *j = (Job *)arg;
-    Generator g;
-    setupGenerator(&g, j->mc, 0);
+    World w;
+    world_setup(&w, j->mc);
     for (long i = j->tid; i < j->seeds; i += j->nthreads) {
         uint64_t st = j->seed0 + (uint64_t)i;
         uint64_t seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL;
         double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
-        applySeed(&g, 0, seed);
-        Pos sp = estimateSpawn(&g, NULL);
+        world_seed(&w, seed);
+        Pos sp = world_spawn(&w);
 
         char *fb = NULL, *gb = NULL;
         size_t fl = 0, fc = 0, gl = 0, gc = 0;
@@ -63,7 +64,7 @@ static void *worker(void *arg) {
             for (long r = 0; r <= j->rmax; r += j->step) {
                 int x = sp.x + (int)floor((double)r * ca + 0.5);
                 int z = sp.z + (int)floor((double)r * sa + 0.5);
-                int b = getBiomeAt(&g, 4, x >> 2, 15, z >> 2);
+                int b = world_biome(&w, x >> 2, 15, z >> 2);
                 if (b < 0 || b > 255) { prev = -2; continue; }
                 if (first[b] < 0) first[b] = (int)r;
                 if (r >= j->far_from) {

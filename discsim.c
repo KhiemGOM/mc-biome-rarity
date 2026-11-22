@@ -15,6 +15,17 @@
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
+#include "c263world.h"
+// Minecraft version: 263 = Java 26.3 (default; climate and spawn from c263climate.h, biome from the fork's btree263),
+// 214 = the old path exactly as before (Cubiomes "1.21").
+#ifndef DX_VERSION
+#define DX_VERSION 263
+#endif
+#if DX_VERSION == 263
+#define SIM_MC MC_26_3
+#else
+#define SIM_MC str2mc("1.21")
+#endif
 
 #define G 16
 #define QY_REF 15
@@ -38,21 +49,23 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
 }
 
 // identical arithmetic to colsim surface_only, hint-free
-static int surface_only(const Generator *g, int qx, int qz) {
-    int64_t np[6];
-    sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
+static int surface_only(const World *w, int qx, int qz) {
+    const Generator *g = &w->g;
+    int64_t np[6]; float off = 0;
+    if (w->is263) { off = c263_column(&w->c, qx, qz, np); np[4] = c263_depth_at(off, QY_REF); }
+    else sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
     double dref = (double)np[4] / 10000.0;
     int qs = (int)floor(QY_REF + 32.0 * dref + 0.5);
     if (qs < QY_MIN) qs = QY_MIN;
     if (qs > QY_MAX) qs = QY_MAX;
     float d = (float)(dref + (double)(QY_REF - qs) / 32.0);
-    np[4] = (int64_t)(10000.0F * d);
+    np[4] = w->is263 ? c263_depth_at(off, qs) : (int64_t)(10000.0F * d);   // 26.3: the exact depth of the surface layer
     return climateToBiome(g->mc, (const uint64_t *)np, NULL);
 }
 
 static void *worker(void *arg) {
     Job *j = (Job *)arg;
-    Generator g; setupGenerator(&g, str2mc("1.21"), 0);
+    World w; world_setup(&w, SIM_MC);
     int rmaxr = 0;
     for (int i = 0; i < j->nr; i++) if (j->radii[i] > rmaxr) rmaxr = j->radii[i];
     for (long i = j->tid; i < j->seeds; i += j->nth) {
@@ -60,8 +73,8 @@ static void *worker(void *arg) {
         uint64_t seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL;
         double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
-        applySeed(&g, 0, seed);
-        Pos sp = estimateSpawn(&g, NULL);
+        world_seed(&w, seed);
+        Pos sp = world_spawn(&w);
         char *buf = NULL; size_t len = 0, cap = 0; char line[160];
         for (int k = 0; k < j->rays; k++) {
             double ang = 2.0 * M_PI * ((double)k + u) / (double)j->rays;
@@ -80,7 +93,7 @@ static void *worker(void *arg) {
                     if (!any) continue;
                     double px = (double)s * ca - (double)t * sa, pz = (double)s * sa + (double)t * ca;
                     int x = sp.x + (int)floor(px + 0.5), z = sp.z + (int)floor(pz + 0.5);
-                    int b = surface_only(&g, x >> 2, z >> 2);
+                    int b = surface_only(&w, x >> 2, z >> 2);
                     if (b < 0 || b >= 256) continue;
                     if (center && (fm[0][b] < 0 || s < fm[0][b])) fm[0][b] = (int)s;
                     for (int m = 0; m < j->nr; m++) {

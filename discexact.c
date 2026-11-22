@@ -21,6 +21,7 @@
 #endif
 #if DX_VERSION == 263
 #include "tables/btree263.h"
+#include "c263climate.h"   // 26.3 climate and spawn, bit-exact with the game (gamecheck/)
 #define DX_MCV MC_26_3
 #define DX_BT(x) btree263_##x
 #elif DX_VERSION == 214
@@ -54,7 +55,26 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
 }
 
 static __thread FastCache FC_TLS;
-#ifdef DISCEXACT_REFERENCE
+#if DX_VERSION == 263
+// per thread 26.3 climate state, (re)built when the generator's seed changes
+static __thread C263 C263_TLS; static __thread uint64_t C263_SEED; static __thread int C263_READY = 0;
+static inline const C263 *c263_of(const Generator *g) {
+    if (!C263_READY || C263_SEED != g->seed) { c263_init(&C263_TLS, g->seed); C263_SEED = g->seed; C263_READY = 1; }
+    return &C263_TLS;
+}
+// surface layer (same rule as before: the layer whose depth is nearest 0, from the depth at QY_REF), with 26.3's
+// exact depth at that layer, then the fork's hint-free btree263 lookup
+static int surface_only(const Generator *g, int qx, int qz) {
+    const C263 *c = c263_of(g); int64_t np[6];
+    float off = c263_column(c, qx, qz, np);
+    double dref = (double)c263_depth_at(off, QY_REF) / 10000.0;
+    int qs = (int)floor(QY_REF + 32.0 * dref + 0.5);
+    if (qs < QY_MIN) qs = QY_MIN;
+    if (qs > QY_MAX) qs = QY_MAX;
+    np[4] = c263_depth_at(off, qs);
+    return climateToBiome(g->mc, (const uint64_t *)np, NULL);
+}
+#elif defined(DISCEXACT_REFERENCE)
 static int surface_only(const Generator *g, int qx, int qz) {          // hint-free, same arithmetic as colsim
     int64_t np[6];
     sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
@@ -204,7 +224,11 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
     if (COL_REF) return column_set_ref(g, qx, qz, out);
     pthread_once(&CLS_ONCE, cls_init);
     int64_t np[6]; uint8_t seen[256] = {0};
+#if DX_VERSION == 263
+    float off = c263_column(c263_of(g), qx, qz, np);
+#else
     double off = fast_np_column(g, &FC_TLS, np, qx, qz);
+#endif
     const uint64_t *u = (const uint64_t *)np;
     int win[NCLS]; uint64_t cst[NCLS];
     int paired = 0;
@@ -224,7 +248,11 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
         }
     }
     for (int y = FC_QY_MIN; y <= FC_QY_MAX; y++) {
+#if DX_VERSION == 263
+        int64_t x = c263_depth_at(off, y); int bw = -1; uint64_t bc = 0;
+#else
         int64_t x = fast_depth_at(off, y); int bw = -1; uint64_t bc = 0;
+#endif
         for (int c = 0; c < NCLASS; c++) {
             if (win[c] < 0) continue;
             uint64_t t = cst[c] + gdepth(x, c);
@@ -239,7 +267,11 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
 static int column_set_ref(const Generator *g, int qx, int qz, int *out) {
     uint8_t seen[256] = {0}; int64_t np[6];
     for (int y = FC_QY_MIN; y <= FC_QY_MAX; y++) {
+#if DX_VERSION == 263
+        c263_sample6(c263_of(g), qx, y, qz, np);          // the game's point path (Climate.Sampler.sample)
+#else
         sampleBiomeNoise(&g->bn, np, qx, y, qz, NULL, SAMPLE_NO_BIOME);
+#endif
         seen[climateToBiome(g->mc, (const uint64_t *)np, NULL) & 0xFF] = 1;
     }
     int n = 0; for (int b = 0; b < 256; b++) if (seen[b]) out[n++] = b;
@@ -372,7 +404,11 @@ static long ORIGIN_L = 0;          /* 0: spawn (estimateSpawn). L > 0: uniform c
 
 /* Start point. The uniform start uses its own splitmix stream of the seed, independent of the angle stream. */
 static Pos start_of(Generator *g, uint64_t seed) {
+#if DX_VERSION == 263
+    if (ORIGIN_L <= 0) { Pos p; c263_spawn(c263_of(g), &p.x, &p.z); return p; }   // NoiseSpawnFinder, bit-exact
+#else
     if (ORIGIN_L <= 0) return estimateSpawn(g, NULL);
+#endif
     uint64_t st = seed ^ 0x9E3779B97F4A7C15ULL ^ 0x5851F42D4C957F2DULL;
     uint64_t w = 2 * (uint64_t)ORIGIN_L + 1;
     Pos p; p.x = (int)((long)(splitmix64(&st) % w) - ORIGIN_L); p.z = (int)((long)(splitmix64(&st) % w) - ORIGIN_L);
