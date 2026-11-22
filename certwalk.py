@@ -258,6 +258,39 @@ def n_of(man, r):
     return sum(c["n"] for c in man if r in c["radii"])
 
 
+def extension(plan):
+    """The recorded spawn arm extension past n_max (THEORY.md 8.10, Proposition 27b), or None."""
+    if "out" not in plan:
+        return None
+    p = os.path.join(plan["out"], "extension.json")
+    ext = json.load(open(p)) if os.path.exists(p) else None
+    if ext and ext["plan_hash"] != plan_hash(plan):
+        raise ValueError(f"{p} belongs to another plan")
+    return ext
+
+
+def limit_of(plan, r, arm="spawn"):
+    """Most seeds radius r may reach in this arm: n_max, or the reserved extension (spawn arm only)."""
+    ext = extension(plan) if arm == "spawn" else None
+    return max(plan["n_max"][str(r)], ext["n"]) if ext else plan["n_max"][str(r)]
+
+
+def reserve_extension(plan, n, ledger_path):
+    """Reserve seed indices [seed0 + max n_max, seed0 + n) for the spawn arm before any of them is simulated.
+    Refuses an overlap with any used range (A1: fresh seeds). Idempotent for the same or a smaller n."""
+    ext = extension(plan)
+    if ext and ext["n"] >= n:
+        return ext
+    lo = plan["seed0"] + (ext["n"] if ext else max(plan["n_max"].values()))
+    ledger = json.load(open(ledger_path)) if os.path.exists(ledger_path) else []
+    cr.check_fresh(lo, plan["seed0"] + n - lo, ledger)
+    ledger.append(dict(seed0=lo, n=plan["seed0"] + n - lo, purpose=f"certwalk extension {plan_hash(plan)[:12]} (spawn arm)"))
+    ext = dict(n=int(n), arms=["spawn"], plan_hash=plan_hash(plan), ranges=(ext["ranges"] if ext else []) + [[lo, plan["seed0"] + n]])
+    json.dump(ledger, open(ledger_path, "w"), indent=1)
+    json.dump(ext, open(os.path.join(plan["out"], "extension.json"), "w"), indent=1)
+    return ext
+
+
 def stats_at(plan, data, r, b):
     """(spawn quantity, uniform quantity or None, bias or None) for (b, r) on the seeds both arms share."""
     A, si, man = data["spawn"]; n = n_of(man, r)
@@ -266,11 +299,16 @@ def stats_at(plan, data, r, b):
     if r not in plan["arm_radii"]["uniform"] or data.get("uniform") is None:
         return qs, None, None
     Au, siu, manu = data["uniform"]; nu = n_of(manu, r)
-    if nu != n:
-        raise ValueError(f"r={r}: arms disagree on seeds ({n} vs {nu})")
-    keep = siu < n
-    qu = quantity(Au[keep], siu[keep], n, plan, b, r)
-    return qs, qu, bias(qs, qu, plan, b, r, n)
+    if nu > n:
+        raise ValueError(f"r={r}: uniform arm has more seeds than the spawn arm ({nu} vs {n})")
+    keep = siu < nu
+    qu = quantity(Au[keep], siu[keep], nu, plan, b, r)
+    qu["seeds"] = nu
+    if nu == n:
+        return qs, qu, bias(qs, qu, plan, b, r, n)
+    keep = si < nu                    # paired bias on the seeds both arms share
+    qp = quantity(A[keep], si[keep], nu, plan, b, r)
+    return qs, qu, bias(qp, qu, plan, b, r, nu)
 
 
 def active_radii(plan, data, until=None):
@@ -283,7 +321,7 @@ def active_radii(plan, data, until=None):
     out = []
     for r in man[-1]["radii"]:
         n = n_of(man, r)
-        if n >= plan["n_max"][str(r)]:
+        if n >= limit_of(plan, r):
             continue
         if until is not None and n < until:
             out.append(r); continue
@@ -319,7 +357,7 @@ def run(plan, log=print, until=None):
     while True:
         g = arm_plan(plan, "uniform"); ms, mu = cr.load_manifest(arm_plan(plan, "spawn")), cr.load_manifest(g)
         for c in ms[len(mu):]:                                     # resume after a crash between the two arms
-            ur = [r for r in c["radii"] if r in plan["arm_radii"]["uniform"]]
+            ur = [r for r in c["radii"] if r in plan["arm_radii"]["uniform"] and c["seed0"] - plan["seed0"] < plan["n_max"][str(r)]]
             if ur:
                 _run_chunk(g, c["k"], c["seed0"], ur, log)
         data = {arm: load_arm(plan, arm) for arm in ARMS}
@@ -329,7 +367,7 @@ def run(plan, log=print, until=None):
         k = len(data["spawn"][2]) if data["spawn"] else 0
         s0 = plan["seed0"] + k * plan["chunk"]
         _run_chunk(arm_plan(plan, "spawn"), k, s0, act, log)
-        ur = [r for r in act if r in plan["arm_radii"]["uniform"]]
+        ur = [r for r in act if r in plan["arm_radii"]["uniform"] and s0 - plan["seed0"] < plan["n_max"][str(r)]]
         if ur:
             g = arm_plan(plan, "uniform")
             _run_chunk(g, k, s0, ur, log)
@@ -477,6 +515,12 @@ def tie_groups(rows):
     return groups
 
 
+def _seeds(x, u):
+    """Seed count column; the random start arm may have fewer seeds after a spawn only extension (Proposition 27b)."""
+    nu = u.get("seeds", x["seeds"])
+    return str(x["seeds"]) if nu == x["seeds"] else f"{x['seeds']} ({nu} random start, bias on those)"
+
+
 def _markdown(cert, plan):
     d = plan["alpha"]
     out = ["# Walk from spawn to each biome\n",
@@ -506,7 +550,8 @@ def _markdown(cert, plan):
                     continue
                 out.append(f"| {lab} | {x['name']} | {_fmt(x['ED'])} | {_fmt(e)} | {_fmt(x['ED_lower_no_assumption'] - ROUNDING)} | "
                            f"{100 * x['tail_share']:.1f}% | {_fmt(u['ED'])} ± {_fmt(u['eps_MC'] + ROUNDING)} | "
-                           f"{_fmt(x['bias'])} [{_fmt(x['bias_lo'] - 1)}, {_fmt(x['bias_hi'] + 1)}] | {x['seeds']} |")
+                           f"{_fmt(x['bias'])} [{_fmt(x['bias_lo'] - 1)}, {_fmt(x['bias_hi'] + 1)}] | "
+                           f"{_seeds(x, u)} |")
             rank += len(g)
     return "\n".join(out) + "\n"
 
@@ -586,6 +631,7 @@ def main(argv=None):
     ap.add_argument("--uniform-L", type=int, default=1_000_000)
     ap.add_argument("--samples", type=int, default=3)
     ap.add_argument("--until", type=int, default=None, help="run: continue every radius to this many seeds (capped at n_max)")
+    ap.add_argument("--extend-spawn", action="store_true", help="run --until N past n_max: reserve fresh seeds, spawn arm only (Proposition 27b)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     pp = os.path.join(a.out, "plan.json")
@@ -624,6 +670,10 @@ def main(argv=None):
     plan["threads"] = a.threads
     plan["out"] = os.path.join(ROOT, plan["out"])
     if a.cmd == "run":
+        if a.extend_spawn:
+            if a.until is None:
+                sys.exit("--extend-spawn needs --until N")
+            print(json.dumps(reserve_extension(plan, a.until, os.path.join(ROOT, "out", "certrun", "ledger.json"))))
         run(plan, until=a.until)
     elif a.cmd == "order":
         pair_order(plan, a.alpha_pair, log=print)

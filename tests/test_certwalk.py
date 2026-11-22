@@ -293,3 +293,40 @@ def test_paired_interval_covers_the_true_difference():
         lo, hi = cw.th.BettingCS(np.full(n, float(J)), Wa - Wb + J * C, J, 0.0, 2.0 * C, a, n, *pr).interval()
         miss += not (lo - C <= true <= hi - C)
     assert miss <= 3
+
+
+def test_extension_reserves_fresh_seeds_and_lifts_the_spawn_limit(tmp_path):
+    """Proposition 27b: past n_max only after the new seed range is checked fresh and written to the ledger."""
+    plan = dict(seed0=12_000_000_000, n_max={"0": 100}, out=str(tmp_path), radii=[0], rays=1, uniform_L=1, cap=1,
+                caps={}, chunk=1, alpha=1, alpha_rest=0, biomes=[], target_biomes=[], target={}, alpha_each={},
+                priors={}, n_star={}, arm_radii={"spawn": [0], "uniform": [0]})
+    lp = str(tmp_path / "ledger.json")
+    json.dump([dict(seed0=12_000_000_000, n=100, purpose="this plan"), dict(seed0=12_000_000_500, n=10, purpose="other")],
+              open(lp, "w"))
+    assert cw.limit_of(plan, 0) == 100
+    with pytest.raises(ValueError):
+        cw.reserve_extension(plan, 600, lp)                     # would overlap the other run's seeds
+    assert cw.extension(plan) is None and len(json.load(open(lp))) == 2
+    ext = cw.reserve_extension(plan, 400, lp)
+    assert ext["ranges"] == [[12_000_000_100, 12_000_000_400]] and len(json.load(open(lp))) == 3
+    assert cw.limit_of(plan, 0) == 400 and cw.limit_of(plan, 0, "uniform") == 100
+    cw.reserve_extension(plan, 300, lp)                         # smaller: nothing new
+    assert len(json.load(open(lp))) == 3
+
+
+@pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
+def test_spawn_only_extension_end_to_end(tmp_path):
+    """The uniform arm stops at n_max; report gives spawn quantities on all seeds and the bias on the shared ones."""
+    plan = tiny_plan(tmp_path)
+    cw.run(plan, log=lambda *a: None)
+    lp = str(tmp_path / "ledger.json")
+    cw.reserve_extension(plan, 10, lp)
+    cw.run(plan, log=lambda *a: None, until=10)
+    ms = cr.load_manifest(cw.arm_plan(plan, "spawn")); mu = cr.load_manifest(cw.arm_plan(plan, "uniform"))
+    assert sum(c["n"] for c in ms if 0 in c["radii"]) == 10 and sum(c["n"] for c in mu) == 6
+    cert = cw.report(plan)
+    r0 = [x for x in cert["results"] if x["radius"] == 0]
+    assert all(x["seeds"] == 10 and x["uniform"]["seeds"] == 6 for x in r0)
+    for x in r0:
+        assert x["bias_A_lo"] <= x["bias_A"] <= x["bias_A_hi"]
+    assert "(6 random start, bias on those)" in open(os.path.join(plan["out"], "report.md")).read()

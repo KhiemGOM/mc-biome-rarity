@@ -57,9 +57,8 @@ def analyse(plan, xs=XS, alpha=1e-6, pilot=None, r=0):
         raise ValueError(f"radius {r} has no uniform arm")
     data = {arm: cw.load_arm(plan, arm) for arm in ("spawn", "uniform")}
     J, B = plan["rays"], plan["biomes"]
-    n = cw.n_of(data["spawn"][2], r)
-    if cw.n_of(data["uniform"][2], r) != n:
-        raise ValueError("arms disagree on the number of seeds")
+    ns = {arm: cw.n_of(data[arm][2], r) for arm in ("spawn", "uniform")}   # each arm on its own seeds (separate sequences)
+    n = ns["spawn"]
     a_each = alpha / (2 * len(B) * len(xs))
     pri = _pilot_priors(pilot, B, xs, r)
     names = {int(k): v for k, v in plan.get("names", {}).items()}
@@ -68,10 +67,10 @@ def analyse(plan, xs=XS, alpha=1e-6, pilot=None, r=0):
         for x in xs:
             out = {}
             for arm in ("spawn", "uniform"):
-                A, si, _ = data[arm]; keep = si < n
-                Y = counts(A[keep], si[keep], n, J, b, r, x)
+                A, si, _ = data[arm]; na = ns[arm]; keep = si < na
+                Y = counts(A[keep], si[keep], na, J, b, r, x)
                 lo, hi = prob_cs(Y, J, a_each, pri.get((b, x), 0.05))
-                out[arm] = dict(hits=int(Y.sum()), F=float(Y.sum()) / (n * J), lo=lo, hi=hi)
+                out[arm] = dict(hits=int(Y.sum()), F=float(Y.sum()) / (na * J), lo=lo, hi=hi)
             s, u = out["spawn"], out["uniform"]
             lo, hi = ratio_bounds(s["lo"], s["hi"], u["lo"], u["hi"])
             est = s["F"] / u["F"] if u["F"] > 0 else math.nan
@@ -79,7 +78,7 @@ def analyse(plan, xs=XS, alpha=1e-6, pilot=None, r=0):
             rows.append(dict(biome=int(b), name=names.get(int(b), str(b)), x=x, est=est, lo=lo, hi=hi, verdict=verdict,
                              spawn_hits=s["hits"], spawn_F=s["F"], spawn_lo=s["lo"], spawn_hi=s["hi"],
                              uniform_hits=u["hits"], uniform_F=u["F"], uniform_lo=u["lo"], uniform_hi=u["hi"]))
-    res = dict(plan_hash=plan.get("hash"), radius=r, seeds=n, rays=J, xs=xs, alpha=alpha, alpha_each=a_each,
+    res = dict(plan_hash=plan.get("hash"), radius=r, seeds=n, uniform_seeds=ns["uniform"], rays=J, xs=xs, alpha=alpha, alpha_each=a_each,
                git=cr._git() if os.path.isdir(os.path.join(ROOT, ".git")) else None, rows=rows,
                statement=(f"Except with chance at most {alpha:g} over the seeds (A1, A2), every interval below holds at "
                           f"once (THEORY.md 8.11). At x = 0 the uniform start's chance is the biome's exact area share "
@@ -114,7 +113,8 @@ def markdown(res):
     key = lambda r: (-r["est"] if not math.isnan(r["est"]) else math.inf, -r["lo"])
     L = ["# How much spawn favours or avoids each biome", "",
          f"Spawn likelihood ratio rho(x) = P(found within x blocks, starting at spawn) / P(found within x blocks, "
-         f"random start), THEORY.md 8.11. Radius {res['radius']}, {res['seeds']:,} seeds x {res['rays']} ray per arm. "
+         f"random start), THEORY.md 8.11. Radius {res['radius']}, {res['seeds']:,} seeds from spawn and "
+         f"{res.get('uniform_seeds', res['seeds']):,} from a random start, {res['rays']} ray per seed. "
          f"Except with chance at most {res['alpha']:g} ({_in_words(res['alpha'])}) every range below holds at once.",
          "", f"Plan `{(res['plan_hash'] or '')[:16]}`.", ""]
     if head:

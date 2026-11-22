@@ -649,6 +649,12 @@ A run stops by itself once every target biome meets its precision. `certwalk.py 
 
 A radius that the stopping rule already dropped is not revived. Its seeds would no longer be a prefix.
 
+**Proposition 27b [P | A1, A2] (past $n^{\max}$, spawn arm only, `run --until N --extend-spawn`).** The guarantee of Theorem 20 and of Proposition 28 still holds, at the same $\delta$ and $\alpha_{\text{pair}}$, when the spawn arm continues to any $N > n^{\max}_r$, provided the seed indices $[s_0 + n^{\max}, s_0 + N)$ are checked against the ledger and reserved there before any of them is simulated. The uniform arm stops at $n^{\max}_r$. Its quantities, and the spawn bias $\Delta$ (8.3), are then computed on the first $n_u = n^{\max}_r$ seeds that both arms share.
+
+*Proof.* Theorem 16 has no horizon: $n^\star$ only tunes the bets, and coverage holds at every $n$ at once. $n^{\max}$ enters the guarantee only through the ledger, which keeps the production seeds disjoint from the pilot and from every other run (A1). The reservation keeps that true for the new range. The new seeds are the next indices of the same prefix, so every sequence of the plan simply runs on. The spawn arm's sequences are read at its own stopping time $N$. The uniform arm's and the paired bias sequences are read at their stopping time $n_u$. A confidence sequence covers at every stopping time, and the union bound of Theorem 20 is over sequences, not times, so reading different sequences at different times keeps $\delta$. No new sequence is opened. $\square$
+
+*Disclosure.* Added 2026-11-22 after the 53,750 seed report, to split middle ties at $r = 0$. The decision to extend looked at the results, which Proposition 27's argument allows.
+
 ### 8.11 A spawn effect that does not depend on area or clumping (`spawnratio.py`, added 2026-11-22)
 
 The bias $\Delta = \mathbb E[D] - \mathbb E[D_u]$ of 8.3 is in blocks. Dividing it by $\mathbb E[D_u]$ makes common biomes look strongly affected, because their whole walk fits in the stretch near spawn. Also, for a rare biome $\Delta$ is roughly the size of the spawn zone times how much spawn favours the biome (Remark below), not a fraction of the walk. So we compare the two starts *at the same distance* instead.
