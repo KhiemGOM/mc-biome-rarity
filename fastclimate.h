@@ -186,4 +186,36 @@ static inline int fast_surface(const Generator *g, FastCache *fc, int qx, int qz
     return climateToBiome(g->mc, (const uint64_t *)np, NULL);
 }
 
+// Full column (all 96 quart layers, y = -16..79): the five depth-free climates and the spline offset `off`, so that the
+// depth at quart y is exactly Cubiomes' float d = 1.0 - (y * 4) / 128.0 - 83.0 / 160.0 + off (sampleBiomeNoise).
+// The other five values do not depend on y (Cubiomes samples them at y = 0), so np at layer y is this np with np[4]
+// replaced by fast_depth_at(off, y).
+static inline double fast_np_column(const Generator *g, FastCache *fc, int64_t *np, int x, int z) {
+    const BiomeNoise *bn = &g->bn;
+    fast_cache_bind(fc, bn, g->seed);
+    float t = 0, h = 0, c = 0, e = 0, w = 0;
+    double px = x, pz = z;
+    px += fc_double(bn, &bn->climate[NP_SHIFT], fc->e[0], x, 0, z) * 4.0;
+    pz += fc_double(bn, &bn->climate[NP_SHIFT], fc->e[1], z, x, 0) * 4.0;
+    c = fc_double(bn, &bn->climate[NP_CONTINENTALNESS], fc->e[0], px, 0, pz);
+    e = fc_double(bn, &bn->climate[NP_EROSION], fc->e[0], px, 0, pz);
+    w = fc_double(bn, &bn->climate[NP_WEIRDNESS], fc->e[0], px, 0, pz);
+    float np_param[] = {c, e, -3.0F * (fabsf(fabsf(w) - 0.6666667F) - 0.33333334F), w};
+    double off = getSpline(bn->sp, np_param) + 0.015F;
+    t = fc_double(bn, &bn->climate[NP_TEMPERATURE], fc->e[0], px, 0, pz);
+    h = fc_double(bn, &bn->climate[NP_HUMIDITY], fc->e[0], px, 0, pz);
+    np[0] = (int64_t)(10000.0F * t);
+    np[1] = (int64_t)(10000.0F * h);
+    np[2] = (int64_t)(10000.0F * c);
+    np[3] = (int64_t)(10000.0F * e);
+    np[4] = 0;
+    np[5] = (int64_t)(10000.0F * w);
+    return off;
+}
+
+static inline int64_t fast_depth_at(double off, int y) {
+    float d = 1.0 - (y * 4) / 128.0 - 83.0 / 160.0 + off;
+    return (int64_t)(10000.0F * d);
+}
+
 #endif

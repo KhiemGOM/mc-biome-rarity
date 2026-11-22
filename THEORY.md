@@ -43,7 +43,7 @@ Numerical checks of the theorems on synthetic worlds with known truth are in `te
 |---|---|---|---|---|---|---|
 | game version | 1.21 | all C code | the study is about 1.21 | yes | you | no |
 | start point | `estimateSpawn` | discexact | "walk from spawn" | yes | you (spawn included, 2026-11-22) | no |
-| biome layer | depth 0 climate sample (`surface_only`) on 4x4 cells | discexact | the biome a player sees on the surface, without terrain height | yes | Claude (HANDOFF) | **yes**: surface layer vs biome at terrain height |
+| biome layer | every layer of the 4x4 column, y = -64..319 (`--layers all`, section 8.9); was the depth 0 layer only until 2026-11-22 | discexact | a biome counts if it is anywhere in the column, caves included, as the old colsim column mode did | yes | you (caves must be in, 2026-11-22) | **yes**: whether a cave deep below counts as found, or only near the walking height |
 | discovery radius $r$ | 0, 64, 128 | plan | how close counts as "found" (sight distance) | yes | placeholders (HANDOFF item 3) | **yes** |
 | cap $C_r$ | from the pilot, $\approx 3\,\mathbb E[D]$ | certwalk plan | simulation must stop somewhere | **no** (Theorem 18: it splits $\mathbb E[D]$ into a certified part and a labelled tail; the sum does not depend on $C$) | Claude | no |
 | tail window | $[C/2, C]$ | certwalk | where the tail rate is measured | no, only under $H_C$ | Claude | no |
@@ -595,3 +595,34 @@ With one cap $C = 540{,}000$ for every biome, a common biome (say $\mathbb E[D] 
 *Proof.* The rows are exact for every $b$ in the stop set up to $D \le C$ (Proposition 22), hence for every $C_b \le C$. $C_b$ and the bets are functions of the pilot only, which is independent of the production seeds (A1), so conditionally on the pilot every sequence is a valid betting sequence (Theorem 16 and the Corollary of 8.2). The number of sequences and their levels are unchanged. Validity at any stopping time does not depend on which rule stopped the run. $\square$
 
 *Disclosure.* This rule was added after a progress check showed infinite upper ends for common biomes. The rule uses no production data and the same $4\times$ multiplier as the global cap, so the guarantee is unaffected. Every biome now has a planned tail share of about $e^{-4} \approx 1.8\%$.
+
+### 8.9 All layers of the column: cave biomes included (added 2026-11-22)
+
+**Model change.** The surface map $\beta_S$ of section 1.1 is replaced by the *column map*
+$$\beta^{\mathrm{col}}_S(q) = \{\, \mathrm{biome}_S(q, y) : y = -16, \dots, 79 \,\} \subseteq \mathcal B,$$
+the set of biomes over all 96 quart layers of the cell (world $y = -64$ to $319$), where $\mathrm{biome}_S(q, y)$ is Cubiomes' `sampleBiomeNoise` at $(q_x, y, q_z)$ followed by the hint free `climateToBiome`, that is, the game's stored biome of that 4x4x4 cell. Biome $b$ occupies the cells $A_b = \{q : b \in \beta^{\mathrm{col}}_S(q)\}$ and everything else (the discovery functional of 1.2, $D_b = D(A_b, r)$, sections 8.1 to 8.8) is unchanged. So a cave biome counts as found when the walker comes within $r$ of the column above or below it, at any depth, and a surface biome is found at least as early as before ($A_b^{\mathrm{surf}} \subseteq A_b$ up to the surface reconstruction, checked by `test_column_superset_of_surface_and_caves_found`). The old surface only model is kept as `--layers surface`; certificates from it (the r = 0 run of 2026-11-22) are about the surface model only.
+
+**Assumption audit.** "Present anywhere in the column" is a modelling choice (section 0.2, biome layer): it does not ask whether the cave is open, reachable or visible.
+
+Write $x_i \in \mathbb Z^6$ for the climate vector at layer $i$. Only the depth $x_{i,4}$ depends on the layer: Cubiomes samples the other five noises at $y = 0$, and the depth is the float $d_i = 1 - 4y/128 - 83/160 + \mathrm{off}$ with the spline offset off fixed per cell, so `fast_np_column` computes the five values and off once and `fast_depth_at` reproduces $x_{i,4}$ with the same operations, bit for bit.
+
+The tree search returns a leaf $\ell$ of the 1.21 table. A leaf has a box $\prod_k [a_k, b_k]$ and cost $c(\ell, x) = \sum_k \phi(x_k; a_k, b_k)$ with $\phi(t; a, b) = \max(t - b, a - t, 0)^2$ in exact unsigned 64 bit arithmetic (no overflow: each term is below $2^{31}$).
+
+**Lemma 26a [P + C].** For every $x$, `climateToBiome(x, NULL)` returns the biome of the first leaf, in the search's traversal order, among the leaves of least cost.
+
+*Proof.* Every non-root node's box contains the boxes of its children [C: `test_tree_facts`, all 9,105 parent and child pairs below the root], so a node's cost lower-bounds every leaf below it. By induction on the recursion of `get_resulting_node`: given a current best $(\ell^*, d^*)$, a child subtree is entered only if its bound is $< d^*$, a subtree with bound $\ge d^*$ holds no leaf of cost $< d^*$, and a leaf replaces $\ell^*$ only if its cost is strictly smaller. So after the children are scanned, $\ell^*$ is the first leaf in traversal order of least cost among those seen, and no unseen leaf is cheaper. Starting from $d^* = 2^{64} - 1$ gives the claim. $\square$
+
+**Proposition 26 [P + C] (the class split is exact).** Partition the leaves by their depth interval $[a_4, b_4]$ (classes $K$; in 1.21 there are four: $[0,0]$, $[0.2, 0.9]$, $[1,1]$, $[1.1, 1.1]$ in units of $10^4$ [C]). Let $c_5(\ell) = \sum_{k \ne 4} \phi(x_k; a_k, b_k)$, which does not depend on the layer, and let $w_K$ be the first leaf of class $K$ in traversal order with least $c_5$. Then at every layer $i$ the search's leaf is the first in traversal order among $\{w_K\}$ of least $c_5(w_K) + \phi(x_{i,4}; K)$.
+
+*Proof.* Let $M$ be the set of least cost leaves at layer $i$ and $\ell^*$ its first element (Lemma 26a). Let $K$ be the class of $\ell^*$. Within $K$ the depth term is the same for all leaves, so $\ell^*$ has least $c_5$ in $K$. Any $\ell \in K$ with the same $c_5$ has the same cost and is in $M$, so it comes after $\ell^*$. Hence $\ell^* = w_K$. Every other $w_{K'}$ costs at least as much, and one that costs the same is in $M$ and comes after $\ell^*$. So the rule picks $\ell^*$. $\square$
+
+**How $w_K$ is found [P + C].**
+* Classes with at most 4 leaves (the two cave classes): direct enumeration in traversal order with strict improvement.
+* A large class: the same branch and bound with cost $c_5$, entering a child only if its depth box contains the class interval, since a subtree without that can hold no leaf of the class (nested boxes). The strict improvement argument of Lemma 26a gives $w_K$.
+* **Lemma 26b.** The classes $[0,0]$ and $[1,1]$ pair up leaf by leaf, with the same biome and the same other five intervals, and these boxes are pairwise distinct [C: `test_tree_facts`]. The search over $[0,0]$ also explores subtrees with bound equal to the best and flags a second leaf of equal least $c_5$. If there is no tie, the least $c_5$ in $[1,1]$ is attained only at the partner of $w_{[0,0]}$, so $w_{[1,1]}$ is that partner. If there is a tie, $[1,1]$ is searched separately.
+
+**Check against brute force [C].** `--column-check` compares the class split with all 96 layers through Cubiomes' own functions: 0 mismatches on 96,000 random cells (`test_column_check_brute_force`, cells far out and near spawn). The fast build and the `-DDISCEXACT_REFERENCE` build (brute force column) give byte-identical CSV with early stop on (`test_fast_equals_reference`). `certwalk.py verify` reruns production rays through `--debug`, which uses the brute force column. So the full scan check of 8.7 also checks the class split on production rays.
+
+**Early stop (8.7) and the error budget (8.6) are unchanged.** Lemma 22a and Proposition 22 only use that each cell contributes its biomes at its exact $D_c$. A cell now contributes a set of biomes at the same $D_c$, and the stop set rule and the reach row are per biome. Rounding, geometry and the tail are as before.
+
+**Cost.** 1.27x the surface only scan on the same rays (3.84 s vs 3.02 s for 4 seeds x 4 rays, radii 0, 64, 128, cap 20,000, 4 cloud threads). One noise sample per cell, as before, plus a filtered search and 96 x 4 additions.

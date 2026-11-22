@@ -15,6 +15,7 @@
 #include "generator.h"
 #include "util.h"
 #include "fastclimate.h"
+#include "tables/btree21wd.h"
 
 #define QY_REF 15
 #define QY_MIN (-16)
@@ -38,6 +39,7 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
     memcpy(*buf + *len, s, n); *len += n; (*buf)[*len] = 0;
 }
 
+static __thread FastCache FC_TLS;
 #ifdef DISCEXACT_REFERENCE
 static int surface_only(const Generator *g, int qx, int qz) {          // hint-free, same arithmetic as colsim
     int64_t np[6];
@@ -52,9 +54,183 @@ static int surface_only(const Generator *g, int qx, int qz) {          // hint-f
 }
 #else
 /* Same result bit for bit (fastclimate.h, tests/test_fastclimate.py): lattice-cached, branchless Perlin. */
-static __thread FastCache FC_TLS;
 static int surface_only(const Generator *g, int qx, int qz) { return fast_surface(g, &FC_TLS, qx, qz); }
 #endif
+
+// ---- full column (THEORY.md 8.9) ----------------------------------------------------------------------------
+// The column of a cell is the set of biomes over all 96 quart layers y = -16..79 (world y = -64..319), each layer being
+// exactly Cubiomes' sampleBiomeNoise(qx, y, qz) + hint-free climateToBiome. Only the depth np[4] changes with y.
+static int LAYERS_ALL = 0;            /* 0: surface layer only; 1: every layer of the column */
+static int COL_REF = 0;               /* --debug: brute force column (independent check of the fast path) */
+#define NL (FC_QY_MAX - FC_QY_MIN + 1)
+static const BiomeTree BT21 = { btree21wd_steps, &btree21wd_param[0][0], btree21wd_nodes, btree21wd_order,
+                                sizeof(btree21wd_nodes) / sizeof(uint64_t) };
+// Proposition 26 (THEORY.md 8.9). Every leaf's depth interval is one of a few classes (1.21: [0,0], [0.2,0.9], [1,1],
+// [1.1,1.1]), and np[4] enters the distance only through (distance of np[4] to that interval)^2. So the cost of leaf i
+// at a layer is c_i + g_class(i)(depth), where c_i is the distance over the other five values, which do not change
+// with y. The search returns the first leaf in tree order among those of least cost (Lemma 26a), hence the best of
+// the per class winners (per class: the first leaf in tree order with least c_i). Those are found once per cell (a
+// filtered copy of the same search, or direct enumeration for tiny classes); each of the 96 layers is then 4 sums.
+#define NCLS 8
+static int NCLASS = 0, CLS_LO[NCLS], CLS_HI[NCLS], CLS_N[NCLS], CLS_LEAF[NCLS][4];
+static int16_t LEAF_CLS[1 << 16]; static int32_t LEAF_POS[1 << 16], PARTNER[1 << 16];
+static int BIG0 = -1, BIG1 = -1;       /* two large classes whose leaves pair up with identical biome and 5 value box */
+static uint64_t dist5(const uint64_t np[6], int idx) {
+    uint64_t ds = 0, node = BT21.nodes[idx];
+    for (uint32_t i = 0; i < 6; i++) {
+        if (i == 4) continue;
+        int k = (node >> 8 * i) & 0xFF;
+        uint64_t a = np[i] - BT21.param[2 * k + 1], b = BT21.param[2 * k + 0] - np[i];
+        uint64_t d = (int64_t)a > 0 ? a : (int64_t)b > 0 ? b : 0;
+        ds += d * d;
+    }
+    return ds;
+}
+// the depth term of np_dist for an interval of class c (same unsigned arithmetic)
+static uint64_t gdepth(int64_t x, int c) {
+    uint64_t a = (uint64_t)x - (uint64_t)(int64_t)CLS_HI[c], b = (uint64_t)(int64_t)CLS_LO[c] - (uint64_t)x;
+    uint64_t d = (int64_t)a > 0 ? a : (int64_t)b > 0 ? b : 0;
+    return d * d;
+}
+// a subtree can hold a class c leaf only if its depth box contains the class interval (boxes nest, Lemma 26a)
+static inline int may_hold(int idx, int c) {
+    int p = (BT21.nodes[idx] >> 32) & 0xFF;
+    return BT21.param[2 * p] <= CLS_LO[c] && BT21.param[2 * p + 1] >= CLS_HI[c];
+}
+static int POS_NEXT = 0; static uint8_t LEAF_IS[1 << 16];
+static void cls_walk(int idx, int depth) {               // leaves in the search's own traversal order
+    if (BT21.steps[depth] == 0) {
+        int p = (BT21.nodes[idx] >> 32) & 0xFF, lo = BT21.param[2 * p], hi = BT21.param[2 * p + 1], c;
+        for (c = 0; c < NCLASS; c++) if (CLS_LO[c] == lo && CLS_HI[c] == hi) break;
+        if (c == NCLASS) { if (NCLASS >= NCLS) abort(); CLS_LO[c] = lo; CLS_HI[c] = hi; CLS_N[c] = 0; NCLASS++; }
+        if (CLS_N[c] < 4) CLS_LEAF[c][CLS_N[c]] = idx;
+        CLS_N[c]++; LEAF_CLS[idx] = (int16_t)c; LEAF_POS[idx] = POS_NEXT++; LEAF_IS[idx] = 1;
+        return;
+    }
+    uint32_t step;
+    do { step = BT21.steps[depth]; depth++; } while (idx + step >= BT21.len);
+    int inner = BT21.nodes[idx] >> 48;
+    for (int i = 0; i < BT21.order; i++) { cls_walk(inner, depth); inner += step; if (inner >= (int)BT21.len) break; }
+}
+static pthread_once_t CLS_ONCE = PTHREAD_ONCE_INIT;
+static int same_box(int i, int j) {
+    uint64_t a = BT21.nodes[i], b = BT21.nodes[j];
+    if (((a >> 48) & 0xFF) != ((b >> 48) & 0xFF)) return 0;
+    for (int d = 0; d < 6; d++) {
+        if (d == 4) continue;
+        int p = (a >> 8 * d) & 0xFF, q = (b >> 8 * d) & 0xFF;
+        if (BT21.param[2 * p] != BT21.param[2 * q] || BT21.param[2 * p + 1] != BT21.param[2 * q + 1]) return 0;
+    }
+    return 1;
+}
+static void cls_init(void) {
+    if (BT21.len >= (1 << 16)) abort();
+    cls_walk(0, 0);
+    for (int c = 0; c < NCLASS; c++) if (CLS_N[c] > 4) { if (BIG0 < 0) BIG0 = c; else if (BIG1 < 0) BIG1 = c; else BIG1 = -2; }
+    if (BIG0 < 0 || BIG1 < 0) { BIG1 = -1; return; }
+    if (CLS_N[BIG0] != CLS_N[BIG1]) { BIG1 = -1; return; }
+    for (int i = 0; i < (int)BT21.len; i++) PARTNER[i] = -1;
+    int na = 0, la[1 << 13], lb[1 << 13], nb = 0;
+    for (int i = 0; i < (int)BT21.len; i++) {
+        if (!LEAF_IS[i]) continue;
+        if (LEAF_CLS[i] == BIG0 && na < (1 << 13)) la[na++] = i;
+        else if (LEAF_CLS[i] == BIG1 && nb < (1 << 13)) lb[nb++] = i;
+    }
+    if (na != CLS_N[BIG0] || nb != CLS_N[BIG1]) { BIG1 = -1; return; }
+    static uint8_t used[1 << 13];
+    for (int x = 0; x < na; x++) {
+        int y; for (y = 0; y < nb; y++) if (!used[y] && same_box(la[x], lb[y])) break;
+        if (y == nb) { BIG1 = -1; return; }        /* no pairing: separate searches */
+        used[y] = 1; PARTNER[la[x]] = lb[y];
+    }
+}
+// filtered search: the traversal of leaf_search, distance over the five depth free values, leaves of class c only.
+// Returns the first leaf in tree order with least dist5 among class c leaves with dist5 < *ds (or best), *ds updated.
+static int csearch(const uint64_t np[6], int idx, int best, uint64_t *ds, int depth, int c) {
+    if (BT21.steps[depth] == 0) {
+        if (LEAF_CLS[idx] != c) return best;
+        uint64_t d = dist5(np, idx);
+        if (d < *ds) { *ds = d; return idx; }
+        return best;
+    }
+    uint32_t step;
+    do { step = BT21.steps[depth]; depth++; } while (idx + step >= BT21.len);
+    int inner = BT21.nodes[idx] >> 48;
+    for (int i = 0; i < BT21.order; i++) {
+        if (may_hold(inner, c) && dist5(np, inner) < *ds) best = csearch(np, inner, best, ds, depth, c);
+        inner += step;
+        if (inner >= (int)BT21.len) break;
+    }
+    return best;
+}
+// same, also exploring subtrees whose bound equals the best so far, and setting *tie if a second leaf reaches the minimum
+static int csearch_tie(const uint64_t np[6], int idx, int best, uint64_t *ds, int depth, int c, int *tie) {
+    if (BT21.steps[depth] == 0) {
+        if (LEAF_CLS[idx] != c) return best;
+        uint64_t d = dist5(np, idx);
+        if (d < *ds) { *ds = d; *tie = 0; return idx; }
+        if (d == *ds && best >= 0) *tie = 1;
+        return best;
+    }
+    uint32_t step;
+    do { step = BT21.steps[depth]; depth++; } while (idx + step >= BT21.len);
+    int inner = BT21.nodes[idx] >> 48;
+    for (int i = 0; i < BT21.order; i++) {
+        if (may_hold(inner, c) && dist5(np, inner) <= *ds) best = csearch_tie(np, inner, best, ds, depth, c, tie);
+        inner += step;
+        if (inner >= (int)BT21.len) break;
+    }
+    return best;
+}
+static int column_set_ref(const Generator *g, int qx, int qz, int *out);
+static int column_set(const Generator *g, int qx, int qz, int *out) {
+#ifdef DISCEXACT_REFERENCE
+    return column_set_ref(g, qx, qz, out);
+#endif
+    if (COL_REF) return column_set_ref(g, qx, qz, out);
+    pthread_once(&CLS_ONCE, cls_init);
+    int64_t np[6]; uint8_t seen[256] = {0};
+    double off = fast_np_column(g, &FC_TLS, np, qx, qz);
+    const uint64_t *u = (const uint64_t *)np;
+    int win[NCLS]; uint64_t cst[NCLS];
+    int paired = 0;
+    if (BIG1 >= 0) {                     /* Lemma 26b: a unique minimum in one class gives the other class's winner */
+        uint64_t ds = (uint64_t)-1; int tie = 0;
+        int w = csearch_tie(u, 0, -1, &ds, 0, BIG0, &tie);
+        win[BIG0] = w; cst[BIG0] = ds;
+        if (!tie) { win[BIG1] = PARTNER[w]; cst[BIG1] = ds; paired = 1; }
+    }
+    for (int c = 0; c < NCLASS; c++) {
+        if (BIG1 >= 0 && (c == BIG0 || (c == BIG1 && paired))) continue;
+        win[c] = -1; cst[c] = (uint64_t)-1;
+        if (CLS_N[c] <= 4) {
+            for (int q = 0; q < CLS_N[c]; q++) { uint64_t d = dist5(u, CLS_LEAF[c][q]); if (d < cst[c]) { cst[c] = d; win[c] = CLS_LEAF[c][q]; } }
+        } else {
+            uint64_t ds = (uint64_t)-1; win[c] = csearch(u, 0, -1, &ds, 0, c); cst[c] = ds;
+        }
+    }
+    for (int y = FC_QY_MIN; y <= FC_QY_MAX; y++) {
+        int64_t x = fast_depth_at(off, y); int bw = -1; uint64_t bc = 0;
+        for (int c = 0; c < NCLASS; c++) {
+            if (win[c] < 0) continue;
+            uint64_t t = cst[c] + gdepth(x, c);
+            if (bw < 0 || t < bc || (t == bc && LEAF_POS[win[c]] < LEAF_POS[bw])) { bw = win[c]; bc = t; }
+        }
+        seen[(BT21.nodes[bw] >> 48) & 0xFF] = 1;
+    }
+    int n = 0; for (int b = 0; b < 256; b++) if (seen[b]) out[n++] = b;
+    return n;
+}
+// Reference: every layer, Cubiomes' own functions (no fast path, no class split).
+static int column_set_ref(const Generator *g, int qx, int qz, int *out) {
+    uint8_t seen[256] = {0}; int64_t np[6];
+    for (int y = FC_QY_MIN; y <= FC_QY_MAX; y++) {
+        sampleBiomeNoise(&g->bn, np, qx, y, qz, NULL, SAMPLE_NO_BIOME);
+        seen[climateToBiome(g->mc, (const uint64_t *)np, NULL) & 0xFF] = 1;
+    }
+    int n = 0; for (int b = 0; b < 256; b++) if (seen[b]) out[n++] = b;
+    return n;
+}
 
 // ---- geometry -----------------------------------------------------------------------------------------------
 // interval of s where P0 + s*u lies in the axis-aligned rectangle [xa,xb] x [za,zb]; returns 0 if empty
@@ -146,7 +322,9 @@ static void scan_core(const Generator *g, double px, double pz, double ux, doubl
                 if (D[i] >= 0) any = 1;
             }
             if (!any) continue;
-            emit(ctx, qx, qz, surface_only(g, qx, qz), D);
+            if (!LAYERS_ALL) { emit(ctx, qx, qz, surface_only(g, qx, qz), D); continue; }
+            int bs[256], nb = column_set(g, qx, qz, bs);
+            for (int q = 0; q < nb; q++) emit(ctx, qx, qz, bs[q], D);
         }
     }
 }
@@ -284,6 +462,20 @@ int main(int argc, char **argv) {
             if (!NSTOP) return bad("--stopset empty");
         }
         else if (!strcmp(a, "--origin")) { if (!strcmp(v, "spawn")) ORIGIN_L = 0; else if (sscanf(v, "uniform:%ld", &ORIGIN_L) != 1 || ORIGIN_L < 1 || ORIGIN_L > 20000000) return bad("--origin spawn|uniform:L"); }
+        else if (!strcmp(a, "--layers")) { if (!strcmp(v, "surface")) LAYERS_ALL = 0; else if (!strcmp(v, "all")) LAYERS_ALL = 1; else return bad("--layers surface|all"); }
+        else if (!strcmp(a, "--column-check")) {      /* n random cells per seed: fast bisection vs every layer */
+            long n = atol(v); Generator g; setupGenerator(&g, str2mc("1.21"), 0); long bad_ = 0, tot = 0;
+            for (long s = 0; s < seeds; s++) {
+                uint64_t st = seed0 + (uint64_t)s, seed = splitmix64(&st); applySeed(&g, 0, seed);
+                for (long c = 0; c < n; c++) {
+                    int qx = (int)(splitmix64(&st) % 2000001) - 1000000, qz = (int)(splitmix64(&st) % 2000001) - 1000000;
+                    if (c % 4 == 1) { qx = (int)(splitmix64(&st) % 4001) - 2000; qz = (int)(splitmix64(&st) % 4001) - 2000; }
+                    int A[256], B[256], na = column_set(&g, qx, qz, A), nb = column_set_ref(&g, qx, qz, B);
+                    tot++; if (na != nb || memcmp(A, B, sizeof(int) * (size_t)na)) bad_++;
+                }
+            }
+            printf("%ld %ld\n", tot, bad_); return bad_ != 0;
+        }
         else if (!strcmp(a, "--debug")) { if (sscanf(v, "%ld,%d", &dbg_i, &dbg_k) != 2) return bad("--debug i,ray"); }
         else return bad("unknown option");
     }
@@ -302,6 +494,7 @@ int main(int argc, char **argv) {
         save = comma + 1;
     }
     if (dbg_i >= 0) {
+        COL_REF = 1;
         uint64_t st = seed0 + (uint64_t)dbg_i, seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL; double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
         Generator g; setupGenerator(&g, str2mc("1.21"), 0); applySeed(&g, 0, seed);

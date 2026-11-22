@@ -203,7 +203,9 @@ def _origin(plan):
     """Start point option: spawn (default, Cubiomes estimateSpawn) or uniform:L (uniform start in [-L, L]^2)."""
     o = plan.get("origin", "spawn")
     st = plan.get("stopset")
-    return ([] if o == "spawn" else ["--origin", o]) + ([] if not st else ["--stopset", ",".join(map(str, st))])
+    lay = plan.get("layers", "surface")
+    return (([] if o == "spawn" else ["--origin", o]) + ([] if not st else ["--stopset", ",".join(map(str, st))])
+            + ([] if lay == "surface" else ["--layers", lay]))
 
 
 def discexact(seed0, n, radii, plan, out):

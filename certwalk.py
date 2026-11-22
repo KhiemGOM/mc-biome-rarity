@@ -143,7 +143,7 @@ def arm_plan(plan, arm):
     return dict(seed0=plan["seed0"], rays=plan["rays"], radii=list(plan["arm_radii"][arm]), rmax=int(plan["cap"]),
                 R0=0.0, R=float(plan["cap"]), chunk=plan["chunk"], threads=plan.get("threads", 1),
                 origin="spawn" if arm == "spawn" else f"uniform:{int(plan['uniform_L'])}", stopset=plan["biomes"],
-                out=os.path.join(plan["out"], arm))
+                layers=plan.get("layers", "surface"), out=os.path.join(plan["out"], arm))
 
 
 def reach_cost(T_targets, C, r, rng, n=20000):
@@ -153,7 +153,7 @@ def reach_cost(T_targets, C, r, rng, n=20000):
 
 
 def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alpha, alpha_rest, seed0, chunk, out,
-              cap_mult=4.0, uniform_L=1_000_000, uniform_radii=(0,)):
+              cap_mult=4.0, uniform_L=1_000_000, uniform_radii=(0,), layers="surface"):
     """target: {radius: relative half width}. The stop set is every biome seen in the pilot (it must be found or
     capped before a ray stops, so every one of them gets exact rows). cap = cap_mult x the largest target E[D]."""
     rng = np.random.default_rng(12345)
@@ -201,6 +201,8 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alph
                 priors=priors, n_star=n_star, n_max={k: 2 * v for k, v in n_star.items()}, expected_cpu_s=cost,
                 arm_radii={"spawn": list(radii), "uniform": [r for r in radii if r in uniform_radii]},
                 pilot=dict(seed0=pilot_seed0, n=n_pilot), out=out)
+    if layers != "surface":
+        plan["layers"] = layers
     plan["hash"] = plan_hash(plan)
     return plan
 
@@ -208,7 +210,7 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alph
 def plan_hash(plan):
     import hashlib
     keys = ["seed0", "rays", "uniform_L", "radii", "cap", "caps", "chunk", "alpha", "alpha_rest", "biomes", "target_biomes",
-            "target", "alpha_each", "priors", "n_star", "n_max", "arm_radii"]
+            "target", "alpha_each", "priors", "n_star", "n_max", "arm_radii"] + (["layers"] if "layers" in plan else [])
     return hashlib.sha256(json.dumps({k: plan[k] for k in keys}, sort_keys=True).encode()).hexdigest()
 
 
@@ -439,6 +441,8 @@ def verify(plan, arm, samples=3, rng=None):
                "--radii", ",".join(map(str, radii)), "--debug", f"{i},{k}"]
         if arm != "spawn":
             cmd += ["--origin", g["origin"]]
+        if plan.get("layers", "surface") != "surface":
+            cmd += ["--layers", plan["layers"]]
         out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.splitlines()
         _, sx, sz, sang = out[0].split()
         px, pz, ang = float(sx), float(sz), float(sang)
@@ -472,7 +476,8 @@ def main(argv=None):
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     ap.add_argument("--seed0", type=int, default=10_000_000_000)
-    ap.add_argument("--pilot-dir", default=os.path.join(ROOT, "out", "certrun", "pilot"))
+    ap.add_argument("--pilot-dir", default=None, help="default: out/certrun/pilot (surface) or out/certwalk_pilot_all (all layers)")
+    ap.add_argument("--layers", choices=["surface", "all"], default="all", help="biome layers per cell (THEORY.md 8.9)")
     ap.add_argument("--pilot-seed0", type=int, default=8_000_000_000)
     ap.add_argument("--pilot-seeds", type=int, default=200)
     ap.add_argument("--radii", default="0,64,128")
@@ -494,13 +499,20 @@ def main(argv=None):
         if os.path.exists(pp):
             sys.exit(f"{pp} exists: a plan is fixed once")
         radii = [int(x) for x in a.radii.split(",")]
-        P = cr.load_csv(os.path.join(a.pilot_dir, "chunk_00000.csv"))
+        pdir = a.pilot_dir or os.path.join(ROOT, "out", "certrun" if a.layers == "surface" else "certwalk_pilot_all",
+                                           "pilot" if a.layers == "surface" else "")
+        pc = os.path.join(pdir, "chunk_00000.csv")
+        if not os.path.exists(pc):                       # deterministic in (seeds, rays, radii, layers): regenerate
+            os.makedirs(pdir, exist_ok=True)
+            cr.discexact(a.pilot_seed0, a.pilot_seeds, sorted(set(radii)),
+                         dict(rays=a.rays, rmax=20000, threads=a.threads, layers=a.layers), pc)
+        P = cr.load_csv(pc)
         cr.check_integrity(P, a.pilot_seed0, a.pilot_seeds, a.rays, sorted(set(P[:, 4].tolist())))
         P = P[np.isin(P[:, 4], radii)]
         tgt = {int(k): float(v) for k, v in (x.split(":") for x in a.target.split(","))}
         plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, names, None if a.target_biomes == "auto" else [inv[t] for t in a.target_biomes.split(",")],
                          tgt, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.cap_mult, a.uniform_L,
-                         tuple(int(x) for x in a.uniform_radii.split(",") if x.strip()))
+                         tuple(int(x) for x in a.uniform_radii.split(",") if x.strip()), a.layers)
         lp = os.path.join(ROOT, "out", "certrun", "ledger.json")
         ledger = json.load(open(lp)) if os.path.exists(lp) else []
         nmax = max(plan["n_max"].values())
