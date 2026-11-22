@@ -8,5 +8,10 @@
   "seed0": 9000000000,
   "n": 25270,
   "purpose": "certrun production d8a92b5a584d (at most n_max)"
+ },
+ {
+  "seed0": 10000000000,
+  "n": 13298,
+  "purpose": "certwalk production 602537e6c873 (both arms)"
  }
 ]

@@ -470,7 +470,8 @@ def main(argv=None):
             sys.exit(f"{pp} exists: a plan is fixed once")
         radii = [int(x) for x in a.radii.split(",")]
         P = cr.load_csv(os.path.join(a.pilot_dir, "chunk_00000.csv"))
-        cr.check_integrity(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii)
+        cr.check_integrity(P, a.pilot_seed0, a.pilot_seeds, a.rays, sorted(set(P[:, 4].tolist())))
+        P = P[np.isin(P[:, 4], radii)]
         tgt = {int(k): float(v) for k, v in (x.split(":") for x in a.target.split(","))}
         plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, names, None if a.target_biomes == "auto" else [inv[t] for t in a.target_biomes.split(",")],
                          tgt, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.cap_mult, a.uniform_L,
