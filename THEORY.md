@@ -648,3 +648,32 @@ A run stops by itself once every target biome meets its precision. `certwalk.py 
 *Proof.* The sequences are confidence sequences, so they cover at every stopping time at once (Theorem 20). The decision to continue, and where to stop, is a function of chunks already finished, so the final seed count is a stopping time. The seeds stay a prefix of the planned seed order: chunk $k$ always uses seeds $s_0 + k \cdot \text{chunk}$ onward. And $n^{\max}_r$ comes from the hashed plan, so the reserved seed range in the ledger is not exceeded. No new sequence is opened, so $\delta$ is unchanged. $\square$
 
 A radius that the stopping rule already dropped is not revived. Its seeds would no longer be a prefix.
+
+### 8.11 A spawn effect that does not depend on area or clumping (`spawnratio.py`, added 2026-11-22)
+
+The bias $\Delta = \mathbb E[D] - \mathbb E[D_u]$ of 8.3 is in blocks. Dividing it by $\mathbb E[D_u]$ makes common biomes look strongly affected, because their whole walk fits in the stretch near spawn. Also, for a rare biome $\Delta$ is roughly the size of the spawn zone times how much spawn favours the biome (Remark below), not a fraction of the walk. So we compare the two starts *at the same distance* instead.
+
+**Definition.** For biome $b$ at radius $r = 0$ and distance $x \ge 0$, let $F(x) = P(D \le x)$ (start at spawn) and $F_u(x) = P(D_u \le x)$ (uniform start, 8.3). The **spawn likelihood ratio** is
+$$ \rho_b(x) = \frac{F(x)}{F_u(x)} \quad (F_u(x) > 0). $$
+$\rho_b(x) > 1$ means a player starting at spawn is more likely to have found $b$ within $x$ blocks than one starting at a random place.
+
+**Proposition 29 [P] (area cancels exactly at $x = 0$).** At $r = 0$, $F_u(0) = a_b$, the fraction of cells of $[-L, L]^2$ whose column contains $b$, and $F(0) = P(\text{the spawn column contains } b)$. Hence
+$$ \rho_b(0) = \frac{P(\text{spawn column contains } b)}{a_b}. $$
+
+*Proof.* With $r = 0$, $D = 0$ exactly when the start cell's column contains $b$ (section 1.2 and 8.9: the found set at distance 0 is the start column). For the uniform start, the start cell is uniform on the cells of $[-L, L]^2$, independent of the map given the seed, so $P(D_u = 0 \mid \text{seed}) $ is the fraction of those cells containing $b$. Average over seeds. $\square$
+
+So $\rho_b(0)$ is "how many times more (or less) likely the spawn spot is to be in $b$ than a random spot". The area of $b$ is divided out exactly. Clumping does not enter, because a single point has no neighbourhood. This is the headline spawn effect.
+
+**Interpretation for $x > 0$ [E].** $F_u(x)$ is the chance for a walk of length $x$ through the same terrain law from a random start, so it already contains the area and the clumping of $b$ at that scale. $\rho_b(x)$ then shows how far spawn's pull reaches: $\rho_b(x) \to 1$ as $x$ grows, once the walk has left the region that spawn selection shaped. That it removes clumping *exactly* is not claimed for $x > 0$. It is shown as a curve, not as a ranking.
+
+**Remark [A] (why blocks were already fair for rare biomes).** Suppose spawn changes the hazard only on $[0, R]$, and after that both walks have the same constant hazard $h$. Then
+$$ \Delta = \int_0^R (F_u - F)\,dx + \frac{F_u(R) - F(R)}{h}. $$
+For a rare biome, $hR \ll 1$, and $F(R) \approx \bar\rho\, hR$ and $F_u(R) \approx hR$, so $\Delta \approx R(1 - \bar\rho)$, with $\bar\rho$ the average ratio over $[0, R]$. This does not depend on $h$, so it does not depend on area. For a common biome $hR \gg 1$, so $|\Delta| \le \mathbb E[D_u]$ is small in blocks. The percent hides this.
+
+**Bounds [P | A1, A2].** Fix the grid $x_1 < \dots < x_K \le C$ (all below the simulation cap, where the rows are exact, Proposition 22). Per seed $i$, $Y_i(x) = \#\{j : D_{ij} \le x\} \in [0, J]$, so $\mathbb E[Y_i(x)]/J = F(x)$. The Corollary of 8.2 with $E_i \equiv J$, $R_0 = 0$, $R = 1$ gives an anytime valid confidence sequence for $F(x)$ at level $\alpha_\rho/(2BK)$, and the same for $F_u(x)$ from the uniform arm, for each of $B$ biomes. By the union bound, except with chance at most $\alpha_\rho$, all $2BK$ intervals $[\ell, u]$ hold at once. On that event,
+$$ \rho_b(x) \in \Big[\frac{\ell(x)}{u_u(x)},\ \frac{u(x)}{\ell_u(x)}\Big] $$
+for every $b$ and $x$, since $F/F_u$ increases in $F$ and decreases in $F_u$. The upper end is $+\infty$ when $\ell_u = 0$. As in Proposition 27, this holds at the final seed count even though that count was chosen after looking at the data. "Spawn favours $b$" is certified when the lower end is $> 1$, and "avoids" when the upper end is $< 1$.
+
+*Proof.* Each sequence is a valid betting sequence (the bets use only earlier seeds and constants from a pilot on other seeds), so Theorem 16 and the Corollary give coverage at every stopping time. The union bound adds the $2BK$ failure chances. Monotonicity gives the ratio bounds. $\square$
+
+The default is $\alpha_\rho = 10^{-6}$, separate from the $\alpha$ of the E[D] report. Anyone who wants every statement of both reports at once adds the two failure chances.
