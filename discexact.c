@@ -150,6 +150,17 @@ static void emit_min(void *ctx, int qx, int qz, int biome, const double *D) {
     }
 }
 
+static long ORIGIN_L = 0;          /* 0: spawn (estimateSpawn). L > 0: uniform cell-centre start in [-L, L]^2 */
+
+/* Start point. The uniform start uses its own splitmix stream of the seed, independent of the angle stream. */
+static Pos start_of(Generator *g, uint64_t seed) {
+    if (ORIGIN_L <= 0) return estimateSpawn(g, NULL);
+    uint64_t st = seed ^ 0x9E3779B97F4A7C15ULL ^ 0x5851F42D4C957F2DULL;
+    uint64_t w = 2 * (uint64_t)ORIGIN_L + 1;
+    Pos p; p.x = (int)((long)(splitmix64(&st) % w) - ORIGIN_L); p.z = (int)((long)(splitmix64(&st) % w) - ORIGIN_L);
+    return p;
+}
+
 static void *worker(void *arg) {
     Job *j = (Job *)arg;
     Generator g; setupGenerator(&g, str2mc("1.21"), 0);
@@ -159,7 +170,7 @@ static void *worker(void *arg) {
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL;
         double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
         applySeed(&g, 0, seed);
-        Pos sp = estimateSpawn(&g, NULL);
+        Pos sp = start_of(&g, seed);
         char *buf = NULL; size_t len = 0, cap = 0; char line[160];
         for (int k = 0; k < j->rays; k++) {
             double ang = 2.0 * M_PI * ((double)k + u) / (double)j->rays;
@@ -202,6 +213,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "--seed0")) seed0 = strtoull(v, NULL, 10);
         else if (!strcmp(a, "--threads")) threads = atoi(v);
         else if (!strcmp(a, "--out")) out = v;
+        else if (!strcmp(a, "--origin")) { if (!strcmp(v, "spawn")) ORIGIN_L = 0; else if (sscanf(v, "uniform:%ld", &ORIGIN_L) != 1 || ORIGIN_L < 1 || ORIGIN_L > 20000000) return bad("--origin spawn|uniform:L"); }
         else if (!strcmp(a, "--debug")) { if (sscanf(v, "%ld,%d", &dbg_i, &dbg_k) != 2) return bad("--debug i,ray"); }
         else return bad("unknown option");
     }
@@ -223,7 +235,7 @@ int main(int argc, char **argv) {
         uint64_t st = seed0 + (uint64_t)dbg_i, seed = splitmix64(&st);
         uint64_t ust = seed ^ 0xD1B54A32D192ED03ULL; double u = (double)(splitmix64(&ust) >> 11) / 9007199254740992.0;
         Generator g; setupGenerator(&g, str2mc("1.21"), 0); applySeed(&g, 0, seed);
-        Pos sp = estimateSpawn(&g, NULL);
+        Pos sp = start_of(&g, seed);
         double ang = 2.0 * M_PI * ((double)dbg_k + u) / (double)rays;
         printf("# %d %d %.17g\n", sp.x, sp.z, ang);
         scan_ray(&g, (double)sp.x, (double)sp.z, ang, radii, nr, rmax, emit_print, &nr);

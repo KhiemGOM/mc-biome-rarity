@@ -200,23 +200,28 @@ class BettingCS:
         est = self.X.sum() / self.E.sum()
         # lower end: K+ is nonincreasing in m; rejected set is {m : K+(m) >= 2/alpha} = (0, lo]
         a, b = est * 1e-6, est
-        if self.logK_plus(b) >= self.thr:
+        if est <= 0:
+            pass
+        elif self.logK_plus(b) >= self.thr:
             while self.logK_plus(b) >= self.thr:
                 a, b = b, 2 * b
-        if self.logK_plus(a) < self.thr:
+        if est <= 0 or self.logK_plus(a) < self.thr:
             lo = 0.0
         else:
             for _ in range(iters):
                 c = math.sqrt(a * b)
                 a, b = (c, b) if self.logK_plus(c) >= self.thr else (a, c)
             lo = a
+        if est <= 0:                                                   # no mass seen: lower end is 0
+            lo = 0.0
         # upper end: K- is nondecreasing in m; rejected set is [hi, inf)
-        a, b = max(est, lo), max(est, lo) * 2
+        a = max(est, lo); b = 2 * a if a > 0 else self.L * 1e-9
+        a = a if a > 0 else 0.0
         while self.logK_minus(b) < self.thr:
             a, b = b, 2 * b
             if b > 1e12:
                 return lo, math.inf
         for _ in range(iters):
-            c = math.sqrt(a * b)
+            c = math.sqrt(a * b) if a > 0 else b / 2
             a, b = (a, c) if self.logK_minus(c) >= self.thr else (c, b)
         return lo, b

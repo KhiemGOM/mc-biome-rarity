@@ -199,9 +199,15 @@ def manifest_path(plan):
     return os.path.join(plan["out"], "manifest.json")
 
 
+def _origin(plan):
+    """Start point option: spawn (default, Cubiomes estimateSpawn) or uniform:L (uniform start in [-L, L]^2)."""
+    o = plan.get("origin", "spawn")
+    return [] if o == "spawn" else ["--origin", o]
+
+
 def discexact(seed0, n, radii, plan, out):
     cmd = [EXE, "--seeds", n, "--rays", plan["rays"], "--rmax", plan["rmax"], "--radii", ",".join(map(str, radii)),
-           "--seed0", seed0, "--threads", plan.get("threads", 1), "--out", out]
+           "--seed0", seed0, "--threads", plan.get("threads", 1), "--out", out] + _origin(plan)
     subprocess.run([str(a) for a in cmd], check=True)
 
 
@@ -396,7 +402,7 @@ def verify(plan, samples=5, rng=None):
         i, k = int(rng.integers(n_total)), int(rng.integers(J))
         radii = next(c["radii"] for c in man if c["seed0"] <= plan["seed0"] + i < c["seed0"] + c["n"])
         p = subprocess.run([EXE, "--seed0", str(plan["seed0"]), "--rays", str(J), "--rmax", str(rmax),
-                            "--radii", ",".join(map(str, radii)), "--debug", f"{i},{k}"],
+                            "--radii", ",".join(map(str, radii)), "--debug", f"{i},{k}"] + _origin(plan),
                            capture_output=True, text=True, check=True)
         lines = p.stdout.splitlines()
         _, sx, sz, sang = lines[0].split()

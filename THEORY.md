@@ -19,13 +19,62 @@ Every claim carries one tag.
 
 Numerical checks of the theorems on synthetic worlds with known truth are in `tests/test_theory.py` (pure numpy, no Cubiomes, 16 tests), and the reference implementations they use are in `theory.py`.
 
+## 0. Every constant and every interpretation step (audit, 2026-11-22)
+
+**Why this section exists.** The earlier certificate said "under A1 and A2" while the sentence we quoted ("mean walk to find the biome") also needed H (section 1.4) and ignored the first 4,000 blocks. The interval was valid for the quantity it covered ($M$, the inverse hazard on the 4,000 to 20,000 window); the *label* needed two more steps that were not on the certificate. From now on every step from data to a quoted sentence is a row below, and the certificate lists all of them.
+
+### 0.1 Interpretation steps (data to sentence)
+
+| step | from | to | status |
+|---|---|---|---|
+| I1 | the seeds we ran | iid uniform seeds | [A] A1 (tested by fold chi-square) |
+| I2 | the 4 angles of a seed | each angle uniform and independent of the map | [P] by construction, A2 |
+| I3 | the code's distances | the model's $D$ | [P] + [C] sections 4 and 6.3, rounding $\le \frac12$ block |
+| I4 | $\mathbb E[\min(D, C)]$ | a lower bound on $\mathbb E[D]$ from spawn | [P] Theorem 18, no assumption |
+| I5 | the far half $[C/2, C]$ of each ray | the mean tail past the cap $C$ | [A] $H_C$ (constant hazard from $C/2$ on). Affects only the tail share, planned $< 5\%$ |
+| I6 | the model | the game (spawn search, surface layer, no terrain, no line of sight) | [A] modelling, section 4.1 item 6, not provable here |
+| I7 (old) | $M$ on $[4000, 20000]$ | "mean walk" | needed H *and* ignored the spawn start. Retired as a headline; kept as the far-field rate |
+
+### 0.2 Constants
+
+"Estimand" says whether changing the value changes the number being estimated (yes) or only the cost and width (no).
+
+| constant | value | where | why it exists | estimand? | chosen by | decide? |
+|---|---|---|---|---|---|---|
+| game version | 1.21 | all C code | the study is about 1.21 | yes | you | no |
+| start point | `estimateSpawn` | discexact | "walk from spawn" | yes | you (spawn included, 2026-11-22) | no |
+| biome layer | depth 0 climate sample (`surface_only`) on 4x4 cells | discexact | the biome a player sees on the surface, without terrain height | yes | Claude (HANDOFF) | **yes**: surface layer vs biome at terrain height |
+| discovery radius $r$ | 0, 64, 128 | plan | how close counts as "found" (sight distance) | yes | placeholders (HANDOFF item 3) | **yes** |
+| cap $C_r$ | from the pilot, $\approx 3\,\mathbb E[D]$ | certwalk plan | simulation must stop somewhere | **no** (Theorem 18: it splits $\mathbb E[D]$ into a certified part and a labelled tail; the sum does not depend on $C$) | Claude | no |
+| tail window | $[C/2, C]$ | certwalk | where the tail rate is measured | no, only under $H_C$ | Claude | no |
+| window $R_0, R$ | 4,000, 20,000 | certrun (old) | far-field rate $M$ | yes for $M$; not used by the new headline | Claude | retired |
+| rays per seed $J$ | 4 | plan | cost sharing (one spawn search, one generator per seed) | no (every ray has the same law) | Claude | no |
+| angle offset $U$ | splitmix of the seed | discexact | random orientation | no | Claude | no |
+| stride $k$ | 1 (exact) | certrun / certwalk | older runs used sparse grids | yes for $k > 1$ (Theorem 2); certified runs use $k = 1$ only | Claude | no |
+| uniform start box $L$ | $10^6$ blocks | certwalk | the "random start" baseline for the spawn bias | yes for the baseline only | Claude | **yes** (any $L$ inside the world border is a valid baseline; it fixes what "random place" means) |
+| target precision | $\pm 5\%$ | plan | when to stop | no | you (earlier thread) | no |
+| $\alpha$ | 0.05 total, 0.005 for non target biomes | plan | the 95% guarantee | no | Claude | no |
+| tail share limit | 5% | plan | how much of $\mathbb E[D]$ may rest on $H_C$ | no (it sets $C$) | Claude | **yes** if you want less |
+| target biomes | 6 rarest from the pilot | plan | where the $\alpha$ goes | no | Claude | no |
+| seed ranges | fresh, ledger checked | plan | independence from the pilot (Theorem 13) | no | Claude | no |
+
+
 ## 1. The mathematical model
 
 ### 1.1 Population and randomness
 
 * $\mathcal S = \{0,1\}^{64}$ is the set of world seeds. $S$ is uniform on $\mathcal S$.
 * For each seed, $p(S) \in \mathbb Z^2$ is the spawn point and $\beta_S : \mathbb Z^2 \to \mathcal B$ is the surface biome of each 4x4 cell $q = (q_x, q_z)$. Both are deterministic functions of $S$ (they are *defined* as the Cubiomes functions named in section 4, so there is no approximation at this step).
-* $U \sim \mathrm{Unif}[0,1)$ independent of $S$. A seed is explored along $J = 4$ rays with angles $\theta_j = 2\pi (j + U)/J$, $j = 0, \dots, J-1$, direction $u_j = (\cos\theta_j, \sin\theta_j)$. Each $\theta_j$ is marginally uniform on $[0, 2\pi)$ and independent of $S$; the $J$ rays of one seed are dependent (same map), which is why the seed, not the ray, is the sampling unit.
+* **The model has one ray.** $\Theta \sim \mathrm{Unif}[0, 2\pi)$ independent of $S$, direction $u = (\cos\Theta, \sin\Theta)$. Every estimand below is an expectation over $(S, \Theta)$: one walk from spawn in a uniformly random direction. "The mean over all directions" is the same number, since $\mathbb E[g(S,\Theta)] = \mathbb E_S\big[\frac1{2\pi}\int_0^{2\pi} g(S,\theta)\,d\theta\big]$ (Fubini).
+* **The estimator uses $J$ rays per seed** (a sampler choice, not part of the model). With $U \sim \mathrm{Unif}[0,1)$ independent of $S$, ray $j$ has angle $\theta_j = 2\pi (j + U)/J$. Each $\theta_j \bmod 2\pi$ is uniform and independent of $S$.
+
+**Proposition 0 [P] (the $J$ ray average is unbiased for the one ray model).** For any $g \ge 0$ (or integrable), $\mathbb E\big[\frac1J \sum_{j} g(S, \theta_j)\big] = \mathbb E[g(S, \Theta)]$, for every $J \ge 1$.
+
+*Proof.* Condition on $S$ and use the independence of $U$: $\mathbb E\big[\frac1J\sum_j g(S, \theta_j)\big] = \mathbb E_S\big[\frac1J\sum_j \int_0^1 g(S, 2\pi(j+u)/J)\,du\big] = \mathbb E_S\big[\sum_j \int_{j/J}^{(j+1)/J} g(S, 2\pi v)\,dv\big] = \mathbb E_S\big[\int_0^1 g(S, 2\pi v)\,dv\big] = \mathbb E[g(S,\Theta)]$, with the substitution $v = (j + u)/J$ on each term. $\square$
+
+**Correction (2026-11-22).** Earlier versions said each $\theta_j$ is marginally uniform on $[0, 2\pi)$. That is false: $\theta_j$ is uniform on the sector $[2\pi j/J, 2\pi (j+1)/J)$. Nothing proven later used the per ray claim beyond what Proposition 0 gives, because every estimator sums over all $J$ rays of a seed before averaging over seeds; the statements "one ray, by identical marginals" below should be read as "by Proposition 0".
+
+So $J$ changes only the variance and the cost per ray (one generator and one spawn search shared by $J$ rays), never the estimand. The rays of one seed are dependent (same map), which is why the seed, not the ray, is the sampling unit. In everything below, $J$ appears only in the estimators.
 
 ### 1.2 Geometry: the discovery functional
 
@@ -51,7 +100,7 @@ $$ x(d) = \big(\min(d, R) - R_0\big)\,\mathbf 1\{d \ge R_0\}, \qquad e(d) = \mat
 
 Per seed, $X = \sum_{j} x(D^{(j)})$ and $E = \sum_j e(D^{(j)})$. The estimand for biome $b$ and radius $r$ is
 
-$$ M = \frac{\mathbb E[X]}{\mathbb E[E]} = \frac{\mathbb E[x(D)]}{\mathbb E[e(D)]} \quad\text{(one ray, by identical marginals)}, $$
+$$ M = \frac{\mathbb E[X]}{\mathbb E[E]} = \frac{\mathbb E[x(D)]}{\mathbb E[e(D)]} \quad\text{(one ray of the model, by Proposition 0)}, $$
 
 and $M_k$ is the same with $D^k$ in place of $D$.
 
@@ -411,3 +460,78 @@ $$ J \sum_{r} c(r)\,(N_r - N_{r^+}) \quad\text{subject to}\quad \sum_q 2 e^{-N_{
 * **`-march=native` / LTO.** 5 to 9%; identical output here, but bit-identity across other CPUs would need its own argument (no `-ffast-math`, no FMA contraction, same libm). Not worth the risk for the gain.
 
 **How far from optimal?** For a fixed cost per seed, no interval valid at every $N$ can beat the large deviation rate: the leading term $\sqrt{2 \ln(2/\alpha_q) V / N}$ is the Chernoff rate for a Gaussian-like mean. The betting sequence attains it up to $\kappa \approx 1.1$ to $1.3$. The remaining gap to the asymptotic CLT interval (about 1.3x in seeds) is the price of a guarantee that does not assume $N$ is large. This optimality statement is heuristic, not a theorem proved here. The real remaining lever is the cost per lookup (7.5, first item).
+
+
+## 8. The walk from spawn, $\mathbb E[D]$, with no window (`certwalk.py`)
+
+This replaces $M$ as the headline. Nothing before any distance is thrown away: every metre from spawn counts.
+
+### 8.1 Estimand
+
+For biome $b$, radius $r$, and start $p(S)$ (spawn), $D = D(P_b, r)$ from section 1.2 with $\inf\emptyset = \infty$. The estimand is $\mathbb E[D] \in [0, \infty]$.
+
+**Theorem 18 [P] (exact split at any cap).** For every $C > 0$,
+$$ \mathbb E[D] = A_C + S_C\, T_C,\qquad A_C = \mathbb E[\min(D, C)],\quad S_C = P(D > C),\quad T_C = \mathbb E[D - C \mid D > C] $$
+(with $S_C T_C = 0$ if $S_C = 0$). Hence $\mathbb E[D] \ge A_C$, with no assumption at all.
+
+*Proof.* $D = \min(D, C) + (D - C)\mathbf 1\{D > C\}$ pointwise, both terms $\ge 0$; take expectations (linearity holds in $[0, \infty]$ for non negative variables) and write $\mathbb E[(D - C)\mathbf 1\{D > C\}] = S_C T_C$. $\square$
+
+So the cap changes nothing about the estimand. It only decides how much of $\mathbb E[D]$ is certified directly ($A_C$) and how much needs the tail ($S_C T_C$).
+
+**Assumption $H_C$ [A] (constant hazard from $C/2$ on).** $P(D > t \mid D > C/2) = e^{-\lambda (t - C/2)}$ for $t \ge C/2$, some $\lambda > 0$.
+
+**Proposition 19 [P | $H_C$].** Under $H_C$, $T_C = 1/\lambda$, and $1/\lambda$ equals the window ratio $M$ of section 1.3 computed on $[R_0, R] = [C/2, C]$.
+
+*Proof.* Memorylessness of the exponential: given $D > C \ge C/2$, $D - C$ is exponential with rate $\lambda$, mean $1/\lambda$. The window ratio is $1/\lambda$ by the bullet after Lemma 1 with $R_0 = C/2$, $R = C$. $\square$
+
+Without $H_C$ the error is confined to the tail term: $\mathbb E[D] - (A_C + S_C M_{[C/2, C]}) = S_C\,(T_C - M_{[C/2, C]})$. The plan picks $C$ so that the pilot tail share $S_C T_C / \mathbb E[D]$ is below 5% (for an exponential law $S_C T_C/\mathbb E[D] = e^{-C/\mathbb E[D]}$, so $C = \mathbb E[D] \ln 20 \approx 3\,\mathbb E[D]$). $H_C$ is checked by the 4 bin hazard table on $[C/2, C]$ in the report.
+
+### 8.2 Three confidence sequences per arm
+
+Per seed $i$ (rays $j = 1..J$): $W_i = \sum_j \min(D_{ij}, C) \in [0, JC]$, $K_i = \#\{j : D_{ij} > C\} \in [0, J]$, and $(E_i, X_i)$ the window pair of section 1.3 on $[C/2, C]$.
+
+**Corollary [P | A1, A2] (means are a special case of Theorem 16).** Theorem 16 only uses that $0 \le X_i \le J(R - R_0)$, $0 \le E_i \le J$ and $\mathbb E[X_i - M E_i] = 0$. With $E_i \equiv J$, $R_0 = 0$ and $R = C$ (resp. $R = 1$), $X_i = W_i$ (resp. $K_i$) satisfies these with $M = A_C$ (resp. $S_C$). So the same betting construction gives anytime valid confidence sequences for $A_C$ and $S_C$; with $(E_i, X_i)$ on $[C/2, C]$ it gives one for $M_{[C/2,C]}$.
+
+*Proof.* Substitute: $W_i - mJ \ge -mJ$ keeps $K^+$ factors $\ge 1 - \lambda^+ \ge \frac12$, and $W_i - mJ \le JC$ keeps $K^-$ factors $\ge \frac12$. The martingale argument of Theorem 16 is unchanged. $\square$
+
+### 8.3 The spawn bias
+
+Same seeds and the same angles, second arm: start $p_u(S)$ uniform on the cells of $[-L, L]^2$, drawn from its own splitmix stream of the seed (independent of the angle stream). $D_u$ is $D$ from $p_u$. The **spawn bias** is $\Delta = \mathbb E[D] - \mathbb E[D_u]$. Because the seeds are shared, the capped part is a paired mean: $V_i = W_i - W_{u,i} + JC \in [0, 2JC]$, $\mathbb E[V_i]/J = A_C - A_{u,C} + C$. The Corollary with $R = 2C$ gives a confidence sequence for $\Delta_C = A_C - A_{u,C}$, the spawn bias of the capped walk, with no tail assumption. Pairing removes the map to map variance shared by the two arms.
+
+### 8.4 The certificate
+
+**Theorem 20 [P | A1, A2] (simultaneous, any stopping time).** For each (biome, radius) run seven confidence sequences: $A, S, M_{[C/2,C]}$ for each arm and $\Delta_C$, each at its own level, all levels summing to $\le \alpha$, all bets predictable, stopping by the rule in `certwalk.active` (a stopping time of the joint filtration). Then with probability $\ge 1 - \alpha$, all hold at the final time simultaneously. On that event:
+
+1. $\mathbb E[D] \ge A_{\rm lo}$ and $\Delta_C \in [\Delta_{C,\rm lo}, \Delta_{C,\rm hi}]$ (no further assumption);
+2. if also $H_C$ holds for both arms, $\mathbb E[D] \in [A_{\rm lo} + S_{\rm lo} M_{\rm lo},\ A_{\rm hi} + S_{\rm hi} M_{\rm hi}]$ and $\Delta \in [\Delta_{C,\rm lo} + S_{\rm lo}M_{\rm lo} - S_{u,\rm hi}M_{u,\rm hi},\ \Delta_{C,\rm hi} + S_{\rm hi}M_{\rm hi} - S_{u,\rm lo}M_{u,\rm lo}]$.
+
+*Proof.* Theorem 17 with $K = 7 \times$ (biomes $\times$ radii) quantities. 1 is Theorem 18 and the $A$ and $\Delta_C$ sequences. For 2, Theorem 18 and Proposition 19 give $\mathbb E[D] = A + S M$ with all three factors non negative, and $(a, s, m) \mapsto a + s m$ is non decreasing in each on $[0, \infty)^3$, so the box of intervals maps into the stated interval. The same holds for $\Delta = \Delta_C + S M - S_u M_u$, increasing in $S, M$ and decreasing in $S_u, M_u$. $\square$
+
+The radius groups and the two arms run on disjoint chunk folders. The pairing uses only seeds both arms have finished (`certwalk.load_arms`). The stopping rule continues a radius until every target biome has relative half width $\le 5\%$ in *both* arms, or until $n_{\max}$.
+
+### 8.5 Code to model
+
+| code | model | status |
+|---|---|---|
+| `discexact --origin spawn` | $p(S)$ = `estimateSpawn` | [C] unchanged from section 4 |
+| `discexact --origin uniform:L` | $p_u(S)$ uniform on $\{-L..L\}^2$ (blocks) from splitmix of $S \oplus$ a constant | [C] `test_uniform_origin_*` |
+| missing row for a biome on a ray | $D > C$ (never reached within the cap) | [P] the C code emits every biome with a finite capped distance (section 6.3), checked by `verify` |
+| `walk_terms` | $W_i, K_i, E_i, X_i$ | [C] `test_walk_terms_match_dense` |
+| `quantity`, `bias` | Theorem 20 sets | [C] coverage tests in `tests/test_certwalk.py` |
+
+### 8.6 The error budget: code's number vs the model's true $\mathbb E[D]$
+
+The reported range for each biome is the union of four separately stated parts. Only the last involves chance.
+
+| part | size | kind | why |
+|---|---|---|---|
+| geometry (code vs model) | 0 | hard, 100% | sections 4 and 6.3: every cell is checked (stride 1), no sparse grid; `verify` re-derives random production rays |
+| rounding | $\le 0.5$ blocks | hard, 100% | Proposition 12: each stored distance is $\lfloor D + \frac12 \rfloor$, so $\lvert \text{stored} - D\rvert \le \frac12$, and $\min(\cdot, C)$ is 1 Lipschitz |
+| discretisation | 0 | hard, 100% | the model is defined on the game's 4x4 biome cells (section 1.2); there is nothing finer to converge to |
+| cap, lower side | 0 | hard, 100% | Theorem 18: $\mathbb E[D] \ge A_C$ |
+| cap, upper side (tail) | $S_C T_C$, reported as a share | assumption $H_C$ | a finite simulation cannot bound what happens past $C$; the share is planned $\le 5\%$ |
+| seed sampling | $\pm\varepsilon_{\rm MC}$ | random, failure chance $\delta$ | Theorem 20; no finite $N$ method that samples seeds has a deterministic bound (only enumerating all $2^{64}$ seeds would) |
+
+**Proposition 21 [P] (rounding folds into the interval).** If every stored distance $\tilde D$ satisfies $\lvert \tilde D - D \rvert \le \frac12$, then $\lvert \mathbb E\min(\tilde D, C) - \mathbb E \min(D, C)\rvert \le \frac12$, $P(\tilde D > C)$ and $P(D > C)$ differ only by the mass of $D \in (C - \frac12, C + \frac12]$, and the reported interval widened by $\frac12 + C\cdot P(\lvert D - C\rvert \le \frac12)$ on each side contains the unrounded quantity. *Proof.* 1 Lipschitz property of $\min(\cdot, C)$, and $\mathbf 1\{\tilde D > C\} \neq \mathbf 1\{D > C\}$ only if $\lvert D - C \rvert \le \frac12$. $\square$ The second term is below $10^{-4}$ relative for every target (the density of $D$ at $C$ is at most $1/\mathbb E[D]$ scale), and the report adds the $\frac12$ block explicitly.
+
+Each number is reported as $\hat\mu\ \pm\ \varepsilon$ with $\varepsilon = \max(\hat\mu - \ell, u - \hat\mu)$, plus the tail share and the stated $\delta$. Two biomes are **ordered** only if their ranges do not overlap; otherwise they are reported as **tied**.

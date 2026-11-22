@@ -46,7 +46,8 @@ T4 two-phase M_k(all) + [M_1(cal) - M_k(cal)] IS consistent for the exact value 
 T5 constants are measured not assumed. certify.build_terms_stride implements T4 (tested on synthetic worlds).
 
 ## Next steps
-0. CERTIFIED EXACT RUN (supersedes 1-2 below): THEORY.md section 6, certrun.py. The plan is already fixed and committed
+0. CERTIFIED WALK FROM SPAWN (supersedes the certrun window run below): `python3 certwalk.py plan|run|report|verify`. Headline E[D] from spawn, no window, plus spawn bias vs a uniform random start on the same seeds. THEORY.md sections 0 (constants and assumption audit) and 8. Report as estimate +- epsilon with ties where ranges overlap.
+0b. (OLD) CERTIFIED EXACT RUN (supersedes 1-2 below): THEORY.md section 6, certrun.py. The plan is already fixed and committed
    (out/certrun/plan.json: betting confidence sequences, alpha split toward 6 rare biomes x 3 radii, per radius seed counts
    n* = 12,635 / 6,427 / 5,530 for r = 0 / 64 / 128 from index 9,000,000,000, +-5% target, K = 282, alpha = 0.05;
    expected 7.2 CPU hours, stops by itself when every target is met, cap 2 n*). THEORY.md section 7.
