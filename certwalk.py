@@ -371,8 +371,8 @@ def _markdown(cert, plan):
            f"Plan `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
     for r in plan["radii"]:
         rows = [x for x in cert["results"] if x["radius"] == r]
-        top = sorted(rows, key=lambda x: -x["ED"])[:15]
-        out.append(f"\n## Sight radius {r}, cap {plan['cap']:,} blocks (rarest 15)\n\n"
+        top = sorted(rows, key=lambda x: -x["ED"])
+        out.append(f"\n## Sight radius {r}, cap {plan['cap']:,} blocks (all {len(top)} biomes, rarest first, most common last)\n\n"
                    "| rank | biome | E[D] from spawn | ± ε | guaranteed at least | tail share | from a random start | spawn bias | seeds |"
                    "\n|---|---|---|---|---|---|---|---|---|")
         rank = 1
