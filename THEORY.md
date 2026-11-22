@@ -286,10 +286,12 @@ $$ |\tilde M - M| \le \frac{a + M\,\varepsilon}{\tilde B}, \qquad a = \tfrac12 P
 | Seeds behave as iid uniform | [A] A1, tested by fold chi-square |
 | $M$ is a mean walk beyond 20,000 blocks | [A] H |
 | The model matches the game | [A] section 4.1 item 6 |
-| `certrun.py` intervals all hold at once with prob $\ge 1-\alpha$ at the planned N | [P \| A1, A2] Theorem 13 |
+| `certrun.py` intervals all hold at once with prob $\ge 1-\alpha$, at any stopping time | [P \| A1, A2] Theorems 16, 17 |
 | `certrun.py` computes those intervals from exactly the planned seeds and the exact model | [P] + [C] section 6.3, re-checked by `verify` |
 
 ## 6. The certified sampler (`certrun.py`)
+
+*Section 7 replaces the interval (6.1) and the planning (6.2) below with a cheaper scheme that keeps the guarantee; the integrity checks of 6.3 and the `verify` re-derivation are unchanged.*
 
 The sampler is built so that every hypothesis of a theorem is enforced by code, not by discipline. It removes the three weaknesses found above: no sparse level is used (only level 1 rows, every cell), the centerline is the exact $r = 0$ model of `discexact` (not the step 1 walk of Proposition 11), and the intervals are valid for the planned $N$, not only as $N \to \infty$.
 
@@ -340,3 +342,72 @@ with $V$, $\bar E$, $\hat M$ from the pilot. `required_N` takes the smallest $N$
 3. takes the per biome minimum, rounds it, and checks it equals the production row.
 
 **[E] On the pilot:** 4 rays, 1,311,096 cells, largest $|D_{\rm C} - D_{\rm Python}| = 5\times10^{-7}$ (the C debug output prints 6 decimals), 0 missing cells, 0 row mismatches. Running `verify` on a few production rays after the run turns the code to model argument of section 4 into a check on the very data being certified.
+
+
+## 7. Making it cheaper without losing the guarantee
+
+### 7.1 Where the time goes (profiled)
+
+| measurement | value |
+|---|---|
+| share of run time in the biome lookup (`surface_only`) | 98% (same run with the lookup replaced by a constant: 0.38 s instead of 18 s) |
+| time per lookup | 3.26 µs (one 2.1 GHz Xeon core) |
+| cells looked up per ray, $R = 20000$ | 5,573 for radii $\{0\}$; 165,910 for $\{0, 64\}$; 326,829 for $\{0, 64, 128\}$ |
+| fitted cells per ray | $5573 + 2510\, r_{\max}$ (all smaller radii come free with the largest) |
+| per seed overhead (generator setup, `estimateSpawn`) | 3.7 ms |
+| `-O3 -march=native -ffp-contract=off`, LTO | 5 to 9% faster, output bit-identical on this machine (not adopted, see 7.5) |
+
+So the cost of one ray is $c(r_{\max}) = 3.26\,\mu s \times (5573 + 2510\, r_{\max})$: **0.018 s at $r_{\max} = 0$, 0.54 s at 64, 1.07 s at 128.** The centerline is 60 times cheaper than the 128 capsule, and the old plan paid the 128 price for every seed because one seed count served all radii.
+
+**Rays per seed do not matter [P + E].** With $J$ rays per seed, cost is $N J c$ and $\operatorname{Var}\hat M \approx \sigma^2_{\rm ray}\,\mathrm{deff}/(N J)$ with design effect $\mathrm{deff} = 1 + (J - 1)\bar\rho$. Cost times variance is $c\,\sigma^2_{\rm ray}\,\mathrm{deff}$ plus the per seed overhead ($3.7$ ms against $J \times 1$ s, negligible), so $J$ matters only through $\bar\rho$. In the pilot the 18 target quantities have $\mathrm{deff}$ between 0.81 and 1.23 (noise at 200 seeds) and ray correlations between $-0.10$ and $+0.11$. $J = 4$ is kept.
+
+### 7.2 A tighter interval that is valid at every N: betting confidence sequences
+
+For one quantity, with seeds in index order $t = 1, 2, \dots$, an indicator $\iota_t \in \{0, 1\}$ (the seed is in this quantity's stream) and bets $\lambda^\pm_t \in [0, \tfrac12]$, define for $m > 0$
+
+$$ K^+_t(m) = \prod_{s \le t} \Big(1 + \iota_s \lambda^+_s \frac{X_s - m E_s}{J m}\Big), \qquad K^-_t(m) = \prod_{s \le t} \Big(1 - \iota_s \lambda^-_s \frac{X_s - m E_s}{J (R - R_0)}\Big), $$
+
+and $C_t = \{ m > 0 : K^+_t(m) < 2/\alpha_q \text{ and } K^-_t(m) < 2/\alpha_q \}$.
+
+**Theorem 16 [P | A1, A2] (anytime valid confidence sequence).** Let $\mathcal F_t$ be everything computed from seeds $1, \dots, t$ (all biomes, all radii). If $\iota_t$, $\lambda^+_t$, $\lambda^-_t$ are $\mathcal F_{t-1}$ measurable and do not depend on the argument $m$, then $P(\exists t : M \notin C_t) \le \alpha_q$. Moreover each $C_t$ is an interval $(\ell_t, u_t)$, found exactly by bisection.
+
+*Proof.* Factors are $\ge \tfrac12$: $(X - mE)/(Jm) \ge -E/J \ge -1$ and $(X - mE)/(J(R - R_0)) \le X/(J(R-R_0)) \le 1$. At $m = M$, seed $t$ is independent of $\mathcal F_{t-1}$ (A1) and $\mathbb E[X_t - M E_t] = 0$, so $\mathbb E[\text{factor}_t \mid \mathcal F_{t-1}] = 1$: $K^\pm_t(M)$ are nonnegative martingales with $K_0 = 1$. Ville's inequality gives $P(\sup_t K^\pm_t(M) \ge 2/\alpha_q) \le \alpha_q/2$ for each sign; add the two. Monotonicity: every factor of $K^+$ is positive and nonincreasing in $m$ ($X_s \ge 0$), every factor of $K^-$ positive and nondecreasing, so $\{K^+ < c\}$ is an up-set, $\{K^- < c\}$ a down-set, and their intersection an interval. $\square$
+
+Because the statement is uniform in $t$, it holds at any stopping time: **stopping as soon as the interval is narrow enough is allowed**, with no correction. The bets used (`theory.BettingCS`) are $\lambda_t = \min\big(\tfrac12, \sqrt{2\ln(2/\alpha_q)/(n^* \hat v_{t-1})}\big)$, where $\hat v_{t-1}$ is the variance of the normalised increment over seeds before $t$ (at the plug-in $\hat M_{t-1}$, shrunk toward a pilot value), and $n^*$ is the planned horizon. Any other predictable choice would also be valid; this one only makes the interval narrow near $n^*$. Tests: `test_cs_covers_at_every_time_at_once`, `test_wealth_is_monotone_so_the_set_is_an_interval`, `test_bets_are_predictable`, `test_excluded_seeds_do_not_bet`.
+
+**[E] Width.** On worlds resampled from the pilot at 20,000 seeds and $\alpha_q = 0.05/282$: mushroom fields $r=0$ half width 4.6% (empirical Bernstein: 6.0%), pale garden $r=64$ 3.3% (4.1%), mushroom fields $r=128$ 3.4% (4.3%). About 22% narrower, so about 40% fewer seeds for the same width. The asymptotic Bonferroni CLT interval (not valid at finite $N$) is a further 13% narrower: that is the price of the finite $N$ guarantee.
+
+**Theorem 17 [P | A1, A2] (the certificate).** Give each of the $K$ quantities its own level $\alpha_q$ with $\sum_q \alpha_q \le \alpha$, its own stream indicator and bets as in Theorem 16, and let the run stop at any stopping time of $(\mathcal F_t)$. Then with probability $\ge 1 - \alpha$, every $M_q$ is in its final interval, simultaneously.
+
+*Proof.* Every $K^\pm_{q}$ is a martingale for the same joint filtration $\mathcal F_t$, because the streams' indicators and bets are $\mathcal F_{t-1}$ measurable even when they depend on other quantities' data. Union bound over the $K$ events of Theorem 16. The final intervals are $C_{q, \tau}$ at the stopping time $\tau$, covered by "for all $t$". $\square$ Test: `test_simultaneous_coverage_with_unequal_alpha`. Corollary 14 (certified orders) carries over unchanged.
+
+Three free choices follow, none of which can affect validity: the split $\alpha_q$, the stream indicators (which radii each seed computes), and when to stop.
+
+### 7.3 Choosing the free parameters to minimise cost
+
+* **Nested streams.** A seed computed at $r_{\max}$ gives every smaller radius for free. Seed $t$ computes radii $\{ r \le \max \mathcal A_t \}$, where $\mathcal A_t$ is the set of radii still *active* (some target at that radius is wider than the target, and the radius is below its cap $n^{\max}_r$), decided from earlier chunks only (`next_radii`). So $\iota_t$ is predictable.
+* **Alpha split.** The 264 non-target quantities share $\alpha_{\rm rest} = 0.005$; they still get valid simultaneous intervals, just wider. The 18 targets share $0.045$. With the planning model $N_q(\alpha_q) = A_q \ln(2/\alpha_q)$, $A_q = 2\kappa_q^2 V_q / (\text{target}\,\bar E_q m_q)^2$ ($V_q$, $\bar E_q$, $m_q$ from the pilot, $\kappa_q$ the measured ratio of the betting width to its leading term), `optimise` minimises
+$$ J \sum_{r} c(r)\,(N_r - N_{r^+}) \quad\text{subject to}\quad \sum_q 2 e^{-N_{r(q)}/A_q} \le 0.045,\ N_0 \ge N_{64} \ge N_{128}, $$
+($r^+$ the next larger radius) over a grid. This is the Lagrangian trade: more $\alpha$ goes to quantities that are expensive to tighten (rare biomes at the large, costly radii), less to cheap ones.
+* **Stopping.** The run stops each radius as soon as all its targets are met (or at $n^{\max}_r = 2 n^*_r$). With a confidence sequence the plan needs no safety margin: if the pilot was optimistic the run continues, if pessimistic it stops early.
+
+**[E] The committed plan** (`out/certrun/plan.json`, same pilot seeds $8\times10^9 + [0, 200)$, production from $9\times10^9$): $n^*_{128} = 5{,}530$, $n^*_{64} = 6{,}427$, $n^*_0 = 12{,}635$ seeds, **expected 7.2 CPU hours instead of 38** (about 27 minutes on 16 threads), cap 14.4 CPU hours. The $\alpha_q$ of the targets range from $4.5\times10^{-6}$ (stony peaks, $r = 0$: easy, so it gets little) to $1.5\times10^{-2}$ (mushroom fields, $r = 64$).
+
+### 7.4 What the reduction is made of (approximate)
+
+| change | effect on cost | guarantee |
+|---|---|---|
+| betting confidence sequence instead of empirical Bernstein | about 0.6x seeds | Theorem 16 |
+| $\alpha$ split toward the 18 targets, optimised | about 0.75x seeds | Theorem 17 (any split with $\sum \alpha_q \le \alpha$) |
+| separate seed counts per radius (centerline is 60x cheaper) | most $r = 0$ seeds at 1/60 of the cost | Theorem 17 (predictable stream indicators) |
+| stop when met, no 1.10 margin | about 0.9x, adapts to the truth | Theorem 16 (anytime) |
+| rays per seed | none | any $J$ |
+
+### 7.5 Considered and not adopted
+
+* **Skipping lookups with partial climate.** Biome assignment is a nearest-point search over climate boxes in 6 dimensions, so knowing one parameter (say continentalness) does not exclude a biome without a bound on the others. A correct pruning rule needs its own proof; not done.
+* **Sparse sampling plus a calibration subset (Theorem 10).** Sparse levels only save time if unsampled cells are not looked up, and a finite $N$ version needs a confidence sequence for a difference of ratios. Possible, not done; the $r = 0$ calibration term was large in the pilot.
+* **A larger window $R$.** More events per unit cost, but it changes the estimand unless H holds.
+* **`-march=native` / LTO.** 5 to 9%; identical output here, but bit-identity across other CPUs would need its own argument (no `-ffast-math`, no FMA contraction, same libm). Not worth the risk for the gain.
+
+**How far from optimal?** For a fixed cost per seed, no interval valid at every $N$ can beat the large deviation rate: the leading term $\sqrt{2 \ln(2/\alpha_q) V / N}$ is the Chernoff rate for a Gaussian-like mean. The betting sequence attains it up to $\kappa \approx 1.1$ to $1.3$. The remaining gap to the asymptotic CLT interval (about 1.3x in seeds) is the price of a guarantee that does not assume $N$ is large. This optimality statement is heuristic, not a theorem proved here. The real remaining lever is the cost per lookup (7.5, first item).

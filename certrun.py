@@ -1,17 +1,17 @@
-"""Certified exact Monte Carlo sampler (THEORY.md section 6).
+"""Certified exact Monte Carlo sampler (THEORY.md sections 6 and 7).
 
-  python3 certrun.py plan   [--pilot-seeds 200] [--seed0 9000000000] [--radii 0,64,128] [--target 0.05] [--threads T]
-  python3 certrun.py run    [--threads T]          # resumable; chunks of plan["chunk"] seeds
-  python3 certrun.py report                       # certificate.json + report.md
-  python3 certrun.py verify [--samples 5]         # independent re-derivation of the geometry on production rays
+  python3 certrun.py plan   [--pilot-seeds 200] [--target 0.05] [--threads T]   # fixes alpha split, bets, budget
+  python3 certrun.py run    [--threads T]     # sequential, resumable; stops as soon as every target is met
+  python3 certrun.py report                   # certificate.json + report.md
+  python3 certrun.py verify [--samples 5]     # independent re-derivation of the geometry on production rays
 
-What makes it certified (each point is a hypothesis of Theorem 13):
-  - exact model only: level 1 rows of discexact (every cell), r = 0 is the exact centerline (no step walk, no stride);
-  - N is fixed by the plan from a pilot on DIFFERENT seeds, before any production seed is simulated (no optional stopping);
-  - production seeds are fresh: the plan refuses any range that overlaps the ledger or the historical runs;
-  - the report refuses data that are not exactly the planned seeds, or any (seed, ray, radius) without its spawn row;
-  - every (biome, radius) gets an empirical-Bernstein interval at level alpha / K (K = biomes x radii), so all K hold
-    at once with probability >= 1 - alpha for the planned N, under assumptions A1 and A2 only.
+What makes it certified (each point is a hypothesis of Theorem 17):
+  - exact model only: level 1 rows of discexact (every cell); r = 0 is the exact centerline;
+  - every (biome, radius) gets a betting confidence sequence at its own level alpha_q with sum alpha_q = alpha,
+    fixed in the plan from a pilot on DIFFERENT seeds; a confidence sequence covers at every N at once, so the
+    data-dependent stopping rule (stop a radius when its targets are met) keeps the guarantee;
+  - production seeds are fresh (ledger), the plan is hash-locked, and the report refuses data that are not
+    exactly the planned seed prefix or that miss a spawn row.
 """
 import argparse, hashlib, json, math, os, subprocess, sys
 
@@ -97,30 +97,23 @@ def per_seed_EX(si, d, n, rays, R0, R):
     return E, X
 
 
-# ------------------------------------------------------------------ intervals, planning, ordering
-def interval(E, X, R0, R, rays, alpha_each):
-    return th.eb_ratio_ci(E, X, R0, R, rays, alpha=alpha_each)
+# ------------------------------------------------------------------ measured cost constants (THEORY.md 7.1)
+SEC_PER_CELL = 3.26e-6                    # biome lookup, 98% of the run time (profiled on a 2.1 GHz Xeon core)
+def cells_per_ray(rmax_radius, R=20000.0):
+    return (5573 + 2510 * rmax_radius) * R / 20000.0
+def sec_per_ray(rmax_radius, R=20000.0):
+    return SEC_PER_CELL * cells_per_ray(rmax_radius, R)
 
 
-def rel_half(E, X, R0, R, rays, alpha_each, N):
-    """Predicted relative half width of the EB interval at N seeds from pilot moments (THEORY.md 6.3)."""
-    m = X.sum() / E.sum()
-    V = float((X - m * E).var(ddof=1)); L = math.log(4.0 / alpha_each)
-    half = (math.sqrt(2 * V * L / N) + 7 * rays * (R - R0 + m) * L / (3 * (N - 1))) / E.mean()
-    return half / m
+def qkey(b, r):
+    return f"{int(b)}@{int(r)}"
 
 
-def required_N(E, X, R0, R, rays, alpha_each, target, margin=1.10):
-    if E.sum() <= 0:
-        raise ValueError("no pilot events: cannot plan")
-    hi = 2
-    while rel_half(E, X, R0, R, rays, alpha_each, hi) > target:
-        hi *= 2
-    lo = hi // 2
-    while hi - lo > 1:
-        mid = (lo + hi) // 2
-        lo, hi = (mid, hi) if rel_half(E, X, R0, R, rays, alpha_each, mid) > target else (lo, mid)
-    return int(math.ceil(hi * margin))
+# ------------------------------------------------------------------ intervals and ordering
+def stream_cs(E, X, include, plan, b, r):
+    pm, pvp, pvm = plan["priors"][qkey(b, r)]
+    return th.BettingCS(E, X, plan["rays"], plan["R0"], plan["R"], plan["alpha_q"][qkey(b, r)],
+                        plan["n_star"][str(r)], pm, pvp, pvm, include=include).interval()
 
 
 def certified_order(res):
@@ -128,33 +121,165 @@ def certified_order(res):
     return [(a, b) for a in res for b in res if a != b and res[a]["lo"] > res[b]["hi"]]
 
 
+# ------------------------------------------------------------------ planning
+def _calibrate(E, X, rays, R0, R, prior, n_ref, rng):
+    """kappa = (betting half width) / (leading term sqrt(2 ln(2/a) V / N) / (Ebar m)) on a bootstrap world."""
+    a = 1e-4
+    b = rng.integers(0, len(E), n_ref)
+    lo, hi = th.BettingCS(E[b], X[b], rays, R0, R, a, n_ref, *prior).interval()
+    m = X.sum() / E.sum(); V = float((X - m * E).var(ddof=1))
+    lead = math.sqrt(2 * math.log(2 / a) * V / n_ref) / (E.mean() * m)
+    return ((hi - lo) / 2 / (X[b].sum() / E[b].sum())) / lead, 2 * V / (E.mean() * m) ** 2
+
+
+def optimise(A, groups, radii, rays, alpha_t, R):
+    """Minimise rays * sum_r cost_r * (N_r - N_next larger radius) over nested N_r, subject to
+    sum_q 2 exp(-N_g(q) / A_q) <= alpha_t, where A_q = 2 kappa^2 V / (t Ebar m)^2 (THEORY.md 7.2)."""
+    rs = sorted(radii, reverse=True)
+    c = [sec_per_ray(r, R) for r in rs]
+    grid = np.unique(np.geomspace(500, 400000, 90).astype(int))
+    best = None
+    def need(r, N):
+        return sum(2 * math.exp(-N / A[q]) for q in groups.get(r, []))
+    import itertools
+    for Ns in itertools.product(grid, repeat=len(rs)):
+        Ns = np.maximum.accumulate(np.array(Ns))           # smaller radii see at least the seeds of larger ones
+        tot = sum(need(r, N) for r, N in zip(rs, Ns))
+        if tot > alpha_t:
+            continue
+        inc = np.diff(np.concatenate([[0], Ns]))
+        cost = rays * sum(ci * ni for ci, ni in zip(c, inc))
+        if best is None or cost < best[0]:
+            best = (cost, dict(zip(rs, Ns.tolist())))
+    if best is None:
+        raise ValueError("no seed counts on the grid meet the targets")
+    return best
+
+
+def make_plan(P, pilot_seed0, n_pilot, rays, radii, biomes, targets, target, alpha, alpha_rest, seed0, chunk, out, rng):
+    R0, R = 4000.0, 20000.0
+    idx = {signed(seed_of(pilot_seed0 + i)): i for i in range(n_pilot)}
+    si = np.fromiter((idx[s] for s in P[:, 0]), np.int64, P.shape[0])
+    priors, A, groups = {}, {}, {}
+    for r in radii:
+        for b in biomes:
+            m = (P[:, 2] == b) & (P[:, 4] == r)
+            E, X = per_seed_EX(si[m], P[m, 3], n_pilot, rays, R0, R)
+            if E.sum() >= 5:
+                priors[qkey(b, r)] = list(th.BettingCS.pilot_priors(E, X, rays, R0, R))
+            else:                                         # too rare in the pilot: any constant prior is valid
+                priors[qkey(b, r)] = [float(X.sum() / max(E.sum(), 0.5)), 0.25, 0.25]
+            if b in targets:
+                kappa, a = _calibrate(E, X, rays, R0, R, priors[qkey(b, r)], 20000, rng)
+                A[qkey(b, r)] = kappa ** 2 * a / target ** 2
+                groups.setdefault(r, []).append(qkey(b, r))
+    alpha_t = alpha - alpha_rest
+    cost, Nr = optimise(A, groups, radii, rays, alpha_t, R)
+    aq = {q: 2 * math.exp(-Nr[int(q.split("@")[1])] / A[q]) for q in A}
+    scale = alpha_t / sum(aq.values())                  # hand any slack back to the targets (sum stays alpha_t)
+    aq = {q: v * scale for q, v in aq.items()}
+    rest = [qkey(b, r) for r in radii for b in biomes if qkey(b, r) not in aq]
+    for q in rest:
+        aq[q] = alpha_rest / len(rest)
+    plan = dict(seed0=seed0, rays=rays, radii=list(radii), rmax=int(R), R0=R0, R=R, chunk=chunk, alpha=alpha,
+                alpha_rest=alpha_rest, biomes=list(biomes), target_biomes=list(targets), target=target, alpha_q=aq,
+                priors=priors, n_star={str(r): int(n) for r, n in Nr.items()},
+                n_max={str(r): int(2 * n) for r, n in Nr.items()}, expected_cpu_s=cost,
+                pilot=dict(seed0=pilot_seed0, n=n_pilot), out=out)
+    plan["hash"] = plan_hash(plan)
+    return plan
+
+
 # ------------------------------------------------------------------ running discexact
-def chunks(plan):
-    c, n = plan["chunk"], plan["n_seeds"]
-    return [(k, plan["seed0"] + k * c, min(c, n - k * c)) for k in range((n + c - 1) // c)]
-
-
 def chunk_path(plan, k):
     return os.path.join(plan["out"], f"chunk_{k:05d}.csv")
 
 
-def discexact(seed0, n, plan, out):
-    cmd = [EXE, "--seeds", n, "--rays", plan["rays"], "--rmax", plan["rmax"], "--radii", ",".join(map(str, plan["radii"])),
+def manifest_path(plan):
+    return os.path.join(plan["out"], "manifest.json")
+
+
+def discexact(seed0, n, radii, plan, out):
+    cmd = [EXE, "--seeds", n, "--rays", plan["rays"], "--rmax", plan["rmax"], "--radii", ",".join(map(str, radii)),
            "--seed0", seed0, "--threads", plan.get("threads", 1), "--out", out]
     subprocess.run([str(a) for a in cmd], check=True)
 
 
-def run(plan, log=print):
-    for k, s0, n in chunks(plan):
+def load_manifest(plan):
+    p = manifest_path(plan)
+    return json.load(open(p)) if os.path.exists(p) else []
+
+
+def load_all(plan):
+    """All chunks in order, each integrity checked against its own radii. Returns (A, si, man)."""
+    man = load_manifest(plan)
+    if not man:
+        raise ValueError("no chunk in the manifest: nothing has been simulated")
+    parts, n = [], 0
+    for k, c in enumerate(man):
+        if c["k"] != k or c["seed0"] != plan["seed0"] + n:
+            raise ValueError(f"chunk {k}: not the next seed block of the plan")
         p = chunk_path(plan, k)
-        if os.path.exists(p):
-            try:
-                check_integrity(load_csv(p), s0, n, plan["rays"], plan["radii"]); continue
-            except ValueError as e:
-                log(f"chunk {k}: {e}; recomputing")
-        discexact(s0, n, plan, p)
-        check_integrity(load_csv(p), s0, n, plan["rays"], plan["radii"])
-        log(f"chunk {k} done ({s0}..{s0 + n - 1})")
+        if not os.path.exists(p):
+            raise ValueError(f"chunk {k} missing ({p})")
+        Ak = load_csv(p)
+        check_integrity(Ak, c["seed0"], c["n"], plan["rays"], c["radii"])
+        parts.append(Ak); n += c["n"]
+    A = np.concatenate(parts)
+    idx = {signed(seed_of(plan["seed0"] + i)): i for i in range(n)}
+    si = np.fromiter((idx[s] for s in A[:, 0]), np.int64, A.shape[0])
+    return A, si, man
+
+
+def stream_data(A, si, man, plan, b, r):
+    n = sum(c["n"] for c in man)
+    include = np.zeros(n, bool); i = 0
+    for c in man:
+        include[i:i + c["n"]] = r in c["radii"]; i += c["n"]
+    m = (A[:, 2] == b) & (A[:, 4] == r)
+    E, X = per_seed_EX(si[m], A[m, 3], n, plan["rays"], plan["R0"], plan["R"])
+    return E * include, X * include, include
+
+
+def next_radii(plan, A, si, man):
+    """The stopping rule, a function of earlier chunks only (predictable): a radius stays active while it is
+    below its cap and one of its targets is wider than the target; every radius up to the largest active one is
+    computed (free: the cells are a subset)."""
+    active = []
+    for r in plan["radii"]:
+        done = sum(c["n"] for c in man if r in c["radii"])
+        if done >= plan["n_max"][str(r)]:
+            continue
+        if not man:
+            active.append(r); continue
+        for b in plan["target_biomes"]:
+            E, X, inc = stream_data(A, si, man, plan, b, r)
+            lo, hi = stream_cs(E, X, inc, plan, b, r)
+            est = X.sum() / E.sum() if E.sum() > 0 else math.inf
+            if not (math.isfinite(hi) and (hi - lo) / 2 / est <= plan["target"]):
+                active.append(r); break
+    if not active:
+        return []
+    return [r for r in plan["radii"] if r <= max(active)]
+
+
+def run(plan, log=print):
+    os.makedirs(plan["out"], exist_ok=True)
+    man = load_manifest(plan)
+    A = si = None
+    while True:
+        if man:
+            A, si, man = load_all(plan)
+        radii = next_radii(plan, A, si, man)
+        if not radii:
+            log("all targets met (or caps reached): stopping"); return man
+        k = len(man); s0 = plan["seed0"] + sum(c["n"] for c in man)
+        p = chunk_path(plan, k)
+        discexact(s0, plan["chunk"], radii, plan, p)
+        check_integrity(load_csv(p), s0, plan["chunk"], plan["rays"], radii)
+        man.append(dict(k=k, seed0=s0, n=plan["chunk"], radii=radii))
+        json.dump(man, open(manifest_path(plan) + ".tmp", "w"), indent=1); os.replace(manifest_path(plan) + ".tmp", manifest_path(plan))
+        log(f"chunk {k} done: seeds {s0}..{s0 + plan['chunk'] - 1}, radii {radii}")
 
 
 # ------------------------------------------------------------------ report
@@ -166,57 +291,45 @@ def _sha(path):
 
 
 def plan_hash(plan):
-    keys = ["seed0", "n_seeds", "rays", "radii", "rmax", "R0", "R", "alpha", "biomes", "target", "target_biomes", "chunk"]
+    keys = ["seed0", "rays", "radii", "rmax", "R0", "R", "chunk", "alpha", "alpha_rest", "biomes", "target_biomes",
+            "target", "alpha_q", "priors", "n_star", "n_max"]
     return hashlib.sha256(json.dumps({k: plan[k] for k in keys}, sort_keys=True).encode()).hexdigest()
 
 
-def load_all(plan):
-    parts = []
-    for k, s0, n in chunks(plan):
-        p = chunk_path(plan, k)
-        if not os.path.exists(p):
-            raise ValueError(f"chunk {k} missing ({p}): the planned N has not been simulated")
-        parts.append(load_csv(p))
-    A = np.concatenate(parts)
-    check_integrity(A, plan["seed0"], plan["n_seeds"], plan["rays"], plan["radii"])
-    return A
-
-
 def report(plan, names=None):
-    A = load_all(plan)
-    n, J, R0, R = plan["n_seeds"], plan["rays"], float(plan["R0"]), float(plan["R"])
-    if plan["rmax"] != R:
+    if plan["rmax"] != plan["R"]:
         raise ValueError("rmax must equal R (censoring, THEORY.md section 4 row 11)")
-    idx = {signed(seed_of(plan["seed0"] + i)): i for i in range(n)}
-    si_all = np.fromiter((idx[s] for s in A[:, 0]), np.int64, A.shape[0])
-    K = len(plan["biomes"]) * len(plan["radii"])
-    a_each = plan["alpha"] / K
+    total = sum(plan["alpha_q"].values())
+    if total > plan["alpha"] * (1 + 1e-9) or len(plan["alpha_q"]) != len(plan["biomes"]) * len(plan["radii"]):
+        raise ValueError("alpha_q must cover every (biome, radius) and sum to at most alpha")
+    A, si, man = load_all(plan)
     names = names or {}
     results, by_radius = [], {}
     for r in plan["radii"]:
         for b in plan["biomes"]:
-            m = (A[:, 2] == b) & (A[:, 4] == r)
-            E, X = per_seed_EX(si_all[m], A[m, 3], n, J, R0, R)
-            lo, hi = interval(E, X, R0, R, J, a_each)
-            ev = int(E.sum())
-            est, se = (ct.combo([ct.Term(1.0, E, X)])[:2]) if ev > 0 else (math.inf, math.inf)
-            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), events=ev, est=est, lo=lo, hi=hi,
-                       rel_half=(hi - lo) / 2 / est if ev > 0 and math.isfinite(hi) else math.inf,
-                       delta_lo=est - 1.96 * se, delta_hi=est + 1.96 * se)
+            E, X, inc = stream_data(A, si, man, plan, b, r)
+            lo, hi = stream_cs(E, X, inc, plan, b, r)
+            ev = int(E.sum()); est = X.sum() / E.sum() if ev > 0 else math.inf
+            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), seeds=int(inc.sum()), events=ev,
+                       est=est, lo=lo, hi=hi, alpha_q=plan["alpha_q"][qkey(b, r)],
+                       rel_half=(hi - lo) / 2 / est if ev > 0 and math.isfinite(hi) else math.inf)
             if int(b) in plan["target_biomes"]:
                 row["target_met"] = bool(row["rel_half"] <= plan["target"])
-                D = np.full((n, J), np.inf); D[si_all[m], A[m, 1]] = A[m, 3]
-                row["hazard_bins"] = ct.bin_hazards(D, R0, R, bins=4)
+                D = np.full((len(inc), plan["rays"]), np.inf)
+                m = (A[:, 2] == b) & (A[:, 4] == r)
+                D[si[m], A[m, 1]] = A[m, 3]
+                row["hazard_bins"] = ct.bin_hazards(D[inc], plan["R0"], plan["R"], bins=4)
             results.append(row)
             if ev > 0:
                 by_radius.setdefault(int(r), {})[row["name"]] = row
     order = {r: certified_order(res) for r, res in by_radius.items()}
-    cert = dict(plan_hash=plan_hash(plan), n_seeds=n, K=K, alpha=plan["alpha"], alpha_each=a_each,
+    cpu = sum(c["n"] * plan["rays"] * sec_per_ray(max(c["radii"]), plan["R"]) for c in man)
+    cert = dict(plan_hash=plan_hash(plan), seeds_simulated=sum(c["n"] for c in man), K=len(results),
+                alpha=plan["alpha"], est_cpu_s=cpu,
                 statement=f"Under A1 and A2 (THEORY.md 3.1), with probability >= {1 - plan['alpha']:.3f} every one of the "
-                          f"{K} intervals contains its M simultaneously (Theorem 13), hence every listed order too.",
+                          f"{len(results)} intervals contains its M simultaneously (Theorem 17), hence every listed order too.",
                 discexact_sha256=_sha(EXE) if os.path.exists(EXE) else None, git=_git(), results=results,
                 certified_order={str(r): v for r, v in order.items()})
-    os.makedirs(plan["out"], exist_ok=True)
     with open(os.path.join(plan["out"], "certificate.json"), "w") as f:
         json.dump(cert, f, indent=1, default=float)
     with open(os.path.join(plan["out"], "report.md"), "w") as f:
@@ -232,15 +345,15 @@ def _git():
 
 
 def _markdown(cert, plan):
-    out = [f"# Certified exact run\n", cert["statement"] + "\n",
-           f"Seeds: index {plan['seed0']} .. {plan['seed0'] + plan['n_seeds'] - 1} ({plan['n_seeds']} seeds x {plan['rays']} rays). "
-           f"Plan hash `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
+    out = ["# Certified exact run\n", cert["statement"] + "\n",
+           f"{cert['seeds_simulated']} seeds x {plan['rays']} rays from index {plan['seed0']}; about "
+           f"{cert['est_cpu_s'] / 3600:.1f} CPU hours. Plan hash `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
     for r in plan["radii"]:
         rows = sorted([x for x in cert["results"] if x["radius"] == r and x["events"] > 0], key=lambda x: -x["est"])[:15]
-        out.append(f"\n## r = {r} (rarest 15)\n\n| biome | M | certified interval | rel half | events |\n|---|---|---|---|---|")
+        out.append(f"\n## r = {r} (rarest 15)\n\n| biome | M | certified interval | rel half | seeds | events |\n|---|---|---|---|---|---|")
         for x in rows:
             hi = f"{x['hi']:,.0f}" if math.isfinite(x["hi"]) else "inf"
-            out.append(f"| {x['name']} | {x['est']:,.0f} | [{x['lo']:,.0f}, {hi}] | {100 * x['rel_half']:.1f}% | {x['events']} |")
+            out.append(f"| {x['name']} | {x['est']:,.0f} | [{x['lo']:,.0f}, {hi}] | {100 * x['rel_half']:.1f}% | {x['seeds']} | {x['events']} |")
         top = {x["name"] for x in rows[:6]}
         pairs = [p for p in cert["certified_order"].get(str(r), []) if p[0] in top and p[1] in top]
         out.append("\nCertified orders among the top 6: " + (", ".join(f"{a} > {b}" for a, b in pairs) or "none") + "\n")
@@ -271,15 +384,17 @@ def _candidates(px, pz, ang, rr, rmax):
     return np.concatenate(QX), np.concatenate(QZ)
 
 
-def verify(plan, samples=5, rng=None, A=None):
+def verify(plan, samples=5, rng=None):
     """For random production (seed, ray): rerun discexact --debug, recompute every cell's D with theory.cell_D,
     check no cell is missing from the C enumeration, and that the per biome minima equal the production rows."""
     rng = rng or np.random.default_rng()
-    A = load_all(plan) if A is None else A
-    J, rmax, radii = plan["rays"], plan["rmax"], plan["radii"]
+    A, _, man = load_all(plan)
+    J, rmax = plan["rays"], plan["rmax"]
+    n_total = sum(c["n"] for c in man)
     stats = dict(rays_checked=0, cells_checked=0, max_abs_D_err=0.0, missing_cells=0, rows_mismatch=0)
     for _ in range(samples):
-        i, k = int(rng.integers(plan["n_seeds"])), int(rng.integers(J))
+        i, k = int(rng.integers(n_total)), int(rng.integers(J))
+        radii = next(c["radii"] for c in man if c["seed0"] <= plan["seed0"] + i < c["seed0"] + c["n"])
         p = subprocess.run([EXE, "--seed0", str(plan["seed0"]), "--rays", str(J), "--rmax", str(rmax),
                             "--radii", ",".join(map(str, radii)), "--debug", f"{i},{k}"],
                            capture_output=True, text=True, check=True)
@@ -338,9 +453,9 @@ def main(argv=None):
     ap.add_argument("--rays", type=int, default=4)
     ap.add_argument("--target", type=float, default=0.05, help="relative half width wanted for the target biomes")
     ap.add_argument("--alpha", type=float, default=0.05)
+    ap.add_argument("--alpha-rest", type=float, default=0.005, help="share of alpha for the non-target quantities")
     ap.add_argument("--target-biomes", default=",".join(RARE))
     ap.add_argument("--chunk", type=int, default=500)
-    ap.add_argument("--max-seeds", type=int, default=0, help="cap N (then the target may not be met; coverage still holds)")
     ap.add_argument("--samples", type=int, default=5)
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
@@ -350,37 +465,29 @@ def main(argv=None):
         if os.path.exists(pp):
             sys.exit(f"{pp} exists: a plan is fixed once (delete it only if no production chunk has been run)")
         ledger = _ledger(a.out)
-        check_fresh(a.pilot_seed0, a.pilot_seeds, ledger)
+        pilot_entry = [u for u in ledger if u["seed0"] == a.pilot_seed0 and u["n"] == a.pilot_seeds]
+        if not pilot_entry:
+            check_fresh(a.pilot_seed0, a.pilot_seeds, ledger)
+            ledger.append(dict(seed0=a.pilot_seed0, n=a.pilot_seeds, purpose="certrun pilot"))
         radii = [int(x) for x in a.radii.split(",")]
-        pilot = dict(seed0=a.pilot_seed0, n_seeds=a.pilot_seeds, rays=a.rays, radii=radii, rmax=20000,
-                     threads=a.threads, chunk=a.pilot_seeds, out=os.path.join(a.out, "pilot"))
+        pilot = dict(seed0=a.pilot_seed0, rays=a.rays, rmax=20000, threads=a.threads, out=os.path.join(a.out, "pilot"))
         os.makedirs(pilot["out"], exist_ok=True)
-        run(pilot)
-        P = load_all(pilot)
+        pc = os.path.join(pilot["out"], "chunk_00000.csv")
+        if not os.path.exists(pc):
+            discexact(a.pilot_seed0, a.pilot_seeds, radii, pilot, pc)
+        P = load_csv(pc)
+        check_integrity(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii)
         biomes = sorted(names) if names else sorted(set(P[:, 2].tolist()))
         targets = [inv[t] for t in a.target_biomes.split(",")]
-        K = len(biomes) * len(radii)
-        idx = {signed(seed_of(a.pilot_seed0 + i)): i for i in range(a.pilot_seeds)}
-        si = np.fromiter((idx[s] for s in P[:, 0]), np.int64, P.shape[0])
-        need = {}
-        for r in radii:
-            for b in targets:
-                m = (P[:, 2] == b) & (P[:, 4] == r)
-                E, X = per_seed_EX(si[m], P[m, 3], a.pilot_seeds, a.rays, 4000.0, 20000.0)
-                need[f"{names.get(b, b)}@r{r}"] = required_N(E, X, 4000.0, 20000.0, a.rays, a.alpha / K, a.target)
-        N = max(need.values())
-        if a.max_seeds:
-            N = min(N, a.max_seeds)
-        check_fresh(a.seed0, N, ledger + [dict(seed0=a.pilot_seed0, n=a.pilot_seeds, purpose="this plan's pilot")])
-        plan = dict(seed0=a.seed0, n_seeds=N, rays=a.rays, radii=radii, rmax=20000, R0=4000.0, R=20000.0, alpha=a.alpha,
-                    biomes=biomes, chunk=a.chunk, target_biomes=targets, target=a.target, out=os.path.relpath(a.out, ROOT),
-                    pilot=dict(seed0=a.pilot_seed0, n=a.pilot_seeds, required=need))
-        plan["hash"] = plan_hash(plan)
+        plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, biomes, targets, a.target, a.alpha,
+                         a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), np.random.default_rng(0))
+        nmax = max(plan["n_max"].values())
+        check_fresh(a.seed0, nmax, [u for u in ledger if not u["purpose"].startswith("certrun production")])
+        ledger = [u for u in ledger if not u["purpose"].startswith("certrun production")]
+        ledger.append(dict(seed0=a.seed0, n=nmax, purpose=f"certrun production {plan['hash'][:12]} (at most n_max)"))
         json.dump(plan, open(pp, "w"), indent=1)          # commit plan.json and ledger.json before running production
-        ledger += [dict(seed0=a.pilot_seed0, n=a.pilot_seeds, purpose="certrun pilot"),
-                   dict(seed0=a.seed0, n=N, purpose=f"certrun production {plan['hash'][:12]}")]
         json.dump(ledger, open(os.path.join(a.out, "ledger.json"), "w"), indent=1)
-        print(json.dumps(need, indent=1)); print(f"N = {N} seeds x {a.rays} rays, K = {K}, alpha/K = {a.alpha / K:.2e}")
+        print(json.dumps(dict(n_star=plan["n_star"], expected_cpu_hours=plan["expected_cpu_s"] / 3600), indent=1))
         return
     plan = json.load(open(pp))
     if plan.get("hash") != plan_hash(plan):
@@ -390,7 +497,7 @@ def main(argv=None):
     if a.cmd == "run":
         run(plan)
     elif a.cmd == "report":
-        cert = report(plan, names)
+        report(plan, names)
         print(open(os.path.join(plan["out"], "report.md")).read())
     else:
         print(json.dumps(verify(plan, a.samples), indent=1))

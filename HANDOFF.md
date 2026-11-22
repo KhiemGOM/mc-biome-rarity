@@ -47,8 +47,10 @@ T5 constants are measured not assumed. certify.build_terms_stride implements T4 
 
 ## Next steps
 0. CERTIFIED EXACT RUN (supersedes 1-2 below): THEORY.md section 6, certrun.py. The plan is already fixed and committed
-   (out/certrun/plan.json: N = 30,028 seeds x 4 rays from index 9,000,000,000, radii 0,64,128, +-5% target, K = 282, alpha = 0.05).
-   On the many-thread PC: `./build.sh && python3 certrun.py run --threads <T>` (resumable, chunks of 500), then
+   (out/certrun/plan.json: betting confidence sequences, alpha split toward 6 rare biomes x 3 radii, per radius seed counts
+   n* = 12,635 / 6,427 / 5,530 for r = 0 / 64 / 128 from index 9,000,000,000, +-5% target, K = 282, alpha = 0.05;
+   expected 7.2 CPU hours, stops by itself when every target is met, cap 2 n*). THEORY.md section 7.
+   On the many-thread PC: `./build.sh && python3 certrun.py run --threads <T>` (sequential and resumable, chunks of 500), then
    `python3 certrun.py report` and `python3 certrun.py verify --samples 5`. Commit out/certrun/certificate.json and report.md.
    Do not edit plan.json (the hash check refuses) and do not reuse its seed ranges (ledger.json).
 1. Production exact run (the speed-up the owner wants: run on his PC with many threads):

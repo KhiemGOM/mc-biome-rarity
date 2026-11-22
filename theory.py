@@ -143,3 +143,80 @@ def eb_ratio_ci(E, X, R0, R, rays, alpha=0.05, iters=200):
     while h(top) >= 0:
         top *= 2
     return lo, root(est, top)
+
+
+# ------------------------------------------------------------------ anytime-valid confidence sequence (betting)
+class BettingCS:
+    """Confidence sequence for M = E[X_t] / E[E_t] from per seed pairs in seed order (THEORY.md section 7).
+
+    Two nonnegative wealth processes, each a martingale when m = M (seeds iid, bets predictable):
+        K+(m) = prod (1 + l+_t (X_t - m E_t) / (J m))          nonincreasing in m, factor >= 1/2
+        K-(m) = prod (1 - l-_t (X_t - m E_t) / (J (R - R0)))   nondecreasing in m, factor >= 1/2
+    The bets l+_t, l-_t in [0, 1/2] use only seeds before t and never the argument m. By Ville's inequality
+    P(exists t: K+_t(M) >= 2/alpha or K-_t(M) >= 2/alpha) <= alpha, so C_t = {m : both < 2/alpha} covers M at every t
+    at once, including at any data-dependent stopping time. By monotonicity C_t is an interval (lo, hi).
+    `include` (optional, predictable) marks seeds that belong to this stream; excluded seeds have factor 1."""
+
+    def __init__(self, E, X, rays, R0, R, alpha, n_star, prior_m, prior_vp, prior_vm, prior_w=20.0, include=None):
+        """prior_m, prior_vp, prior_vm: plug-in M and variances of the two normalised increments, from a pilot on
+        other seeds (so they are constants here). n_star: horizon the bets are tuned for (any value is valid)."""
+        E = np.asarray(E, float); X = np.asarray(X, float)
+        inc = np.ones(E.size, bool) if include is None else np.asarray(include, bool)
+        self.E, self.X, self.J, self.L = E * inc, X * inc, rays, R - R0
+        self.thr = math.log(2.0 / alpha)
+        c = lambda v: np.concatenate([[0.0], np.cumsum(v)[:-1]])          # sums over seeds strictly before t
+        n, SE, SX = c(inc.astype(float)), c(self.E), c(self.X)
+        SXX, SXE, SEE = c(self.X ** 2), c(self.X * self.E), c(self.E ** 2)
+        w = prior_w
+        m = (SX + prior_m * 0.3 * w) / (SE + 0.3 * w)                    # plug-in M from seeds before t
+        def var(scale):
+            nn = np.maximum(n, 1.0)
+            mean = (SX - m * SE) / scale / nn
+            sec = (SXX - 2 * m * SXE + m * m * SEE) / scale ** 2 / nn
+            return np.where(n >= 2, np.maximum(sec - mean ** 2, 0.0), 0.0)
+        vp = (w * prior_vp + n * var(rays * m)) / (w + n)
+        vm = (w * prior_vm + n * var(rays * self.L)) / (w + n)
+        k = 2.0 * self.thr / max(n_star, 1)
+        self.lp = np.where(inc, np.minimum(0.5, np.sqrt(k / np.maximum(vp, 1e-12))), 0.0)
+        self.lm = np.where(inc, np.minimum(0.5, np.sqrt(k / np.maximum(vm, 1e-12))), 0.0)
+
+    @staticmethod
+    def pilot_priors(E, X, rays, R0, R):
+        """(prior_m, prior_vp, prior_vm) from pilot per seed pairs."""
+        E = np.asarray(E, float); X = np.asarray(X, float)
+        m = X.sum() / E.sum()
+        Z = X - m * E
+        return m, float(np.var(Z / (rays * m))), float(np.var(Z / (rays * (R - R0))))
+
+    def logK_plus(self, m):
+        return float(np.sum(np.log1p(self.lp * (self.X - m * self.E) / (self.J * m))))
+
+    def logK_minus(self, m):
+        return float(np.sum(np.log1p(-self.lm * (self.X - m * self.E) / (self.J * self.L))))
+
+    def interval(self, iters=100):
+        if self.E.sum() <= 0:
+            return 0.0, math.inf
+        est = self.X.sum() / self.E.sum()
+        # lower end: K+ is nonincreasing in m; rejected set is {m : K+(m) >= 2/alpha} = (0, lo]
+        a, b = est * 1e-6, est
+        if self.logK_plus(b) >= self.thr:
+            while self.logK_plus(b) >= self.thr:
+                a, b = b, 2 * b
+        if self.logK_plus(a) < self.thr:
+            lo = 0.0
+        else:
+            for _ in range(iters):
+                c = math.sqrt(a * b)
+                a, b = (c, b) if self.logK_plus(c) >= self.thr else (a, c)
+            lo = a
+        # upper end: K- is nondecreasing in m; rejected set is [hi, inf)
+        a, b = max(est, lo), max(est, lo) * 2
+        while self.logK_minus(b) < self.thr:
+            a, b = b, 2 * b
+            if b > 1e12:
+                return lo, math.inf
+        for _ in range(iters):
+            c = math.sqrt(a * b)
+            a, b = (a, c) if self.logK_minus(c) >= self.thr else (c, b)
+        return lo, b
