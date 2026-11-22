@@ -13,7 +13,7 @@ ORANGE = "#FF9F43"; TEAL = "#2EC4B6"; PINK = "#FF5D8F"; BLUE = "#5AA9FF"
 YELLOW = "#FFD166"; GREEN = "#7BD88F"; PURPLE = "#B197FC"
 W, H = 1280, 720
 FPS = 30
-D = "/home/claude/mcrare/out/"
+D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out") + os.sep
 
 
 def pretty(n):

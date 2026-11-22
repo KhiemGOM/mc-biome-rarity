@@ -23,7 +23,7 @@ plan -> tests first (plan lists failure modes, tests cover them) -> implementati
   Equals the pure block-level model because the 16 blocks of a cell share a biome (tested).
 
 ## Results so far (all 1.21, surface layer)
-Centerline, CERTIFIED (out/cert/cert.json is not in git; regenerate with cert_pipeline.py, ~40 min on 2 cores):
+Centerline, CERTIFIED (out/cert/cert.json is committed; to regenerate it run cert_pipeline.py, ~40 min on 2 cores):
 mean walk +- 95%: mushroom_fields 144,479 (1.85%), pale_garden 113,877 (1.93%), windswept_gravelly_hills 94,501 (1.84%),
 stony_peaks 83,795 (1.70%), ice_spikes 75,689 (1.56%), eroded_badlands 70,390 (1.44%). 38,100 seeds x 4 rays at step 8,
 plus step 1 on 3,300 seeds (two-phase). Richardson alone was 2% off for pale garden (bias not linear in step). verify_cert.py: 25/25 checks.

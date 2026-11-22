@@ -1,4 +1,7 @@
-CUBI ?= /home/claude/cubiomes
+# Cubiomes location: $CUBIOMES if set, else ~/cubiomes. Override with: make CUBIOMES=/path
+CUBIOMES ?= $(HOME)/cubiomes
+CUBI ?= $(CUBIOMES)
+export CUBIOMES
 
 raysim: raysim.c
 	gcc -O3 -fwrapv -I$(CUBI) -o raysim raysim.c $(CUBI)/libcubiomes.a -lm -pthread
