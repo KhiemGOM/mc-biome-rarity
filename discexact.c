@@ -14,6 +14,7 @@
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
+#include "fastclimate.h"
 
 #define QY_REF 15
 #define QY_MIN (-16)
@@ -37,6 +38,7 @@ static void append(char **buf, size_t *len, size_t *cap, const char *s, size_t n
     memcpy(*buf + *len, s, n); *len += n; (*buf)[*len] = 0;
 }
 
+#ifdef DISCEXACT_REFERENCE
 static int surface_only(const Generator *g, int qx, int qz) {          // hint-free, same arithmetic as colsim
     int64_t np[6];
     sampleBiomeNoise(&g->bn, np, qx, QY_REF, qz, NULL, SAMPLE_NO_BIOME);
@@ -48,6 +50,11 @@ static int surface_only(const Generator *g, int qx, int qz) {          // hint-f
     np[4] = (int64_t)(10000.0F * d);
     return climateToBiome(g->mc, (const uint64_t *)np, NULL);
 }
+#else
+/* Same result bit for bit (fastclimate.h, tests/test_fastclimate.py): lattice-cached, branchless Perlin. */
+static __thread FastCache FC_TLS;
+static int surface_only(const Generator *g, int qx, int qz) { return fast_surface(g, &FC_TLS, qx, qz); }
+#endif
 
 // ---- geometry -----------------------------------------------------------------------------------------------
 // interval of s where P0 + s*u lies in the axis-aligned rectangle [xa,xb] x [za,zb]; returns 0 if empty
