@@ -58,8 +58,32 @@ def _sim_priors(T, C, rays, rng, n=4000):
     return dict(A=list(pa), S=list(ps), T=list(pt), dA=list(pd), cv2=cv2, T_hat=T)
 
 
+_PRI = {}
+
+
+def cap_of(plan, b, r):
+    """Per biome cap C_b = min(C, cap_mult x pilot E[D_b]), rounded up to 1,000 (THEORY.md 8.8). A function of the
+    pilot only, so the guarantee is unchanged; it gives every biome the same small tail share and a far window
+    [C_b/2, C_b] that common biomes actually reach."""
+    if "cap" not in plan:
+        return plan["caps"][str(r)]
+    t = plan["priors"][qkey(b, r)]["T_hat"]
+    return int(min(plan["cap"], math.ceil(plan.get("cap_mult", 4.0) * t / 1000.0) * 1000))
+
+
+def priors_of(plan, b, r):
+    """Bets' prior constants for cap C_b, recomputed deterministically from the pilot estimate (any constant is valid)."""
+    C = cap_of(plan, b, r); q = plan["priors"][qkey(b, r)]
+    if "cap" not in plan or C == plan["cap"]:
+        return q
+    key = (plan.get("hash"), b, r)
+    if key not in _PRI:
+        _PRI[key] = _sim_priors(q["T_hat"], C, plan["rays"], np.random.default_rng(1000003 * int(b) + int(r)))
+    return _PRI[key]
+
+
 def _cs(kind, V, E, inc, plan, b, r):
-    q = plan["priors"][qkey(b, r)]; J = plan["rays"]; C = plan["caps"][str(r)]
+    q = priors_of(plan, b, r); J = plan["rays"]; C = cap_of(plan, b, r)
     if kind == "dA":                                             # V = W_spawn - W_uniform + J C, in [0, 2 J C]
         a = plan["alpha_each"][qkey(b, r)]; ns = plan["n_star"][str(r)]
         lo, hi = th.BettingCS(J * inc.astype(float), V, J, 0.0, 2.0 * C, a, ns, *q["dA"], include=inc).interval()
@@ -75,7 +99,7 @@ def _cs(kind, V, E, inc, plan, b, r):
 
 def bias(qs, qu, plan, b, r, n, inc=None):
     """Spawn bias Delta = E[D_spawn] - E[D_uniform] (Theorem 21). The capped part is paired and assumption free."""
-    J, C = plan["rays"], plan["caps"][str(r)]
+    J, C = plan["rays"], cap_of(plan, b, r)
     inc = np.ones(n, bool) if inc is None else inc
     lo, hi = _cs("dA", qs["_W"] - qu["_W"] + J * C, None, inc, plan, b, r)
     d = qs["ED"] - qu["ED"]
@@ -86,7 +110,7 @@ def bias(qs, qu, plan, b, r, n, inc=None):
 
 
 def quantity(A_rows, si, n, plan, b, r, inc=None):
-    W, K, E, X = walk_terms(A_rows, si, n, plan["rays"], b, r, plan["caps"][str(r)])
+    W, K, E, X = walk_terms(A_rows, si, n, plan["rays"], b, r, cap_of(plan, b, r))
     return quantity_from(W, K, E, X, plan, b, r, inc)
 
 
@@ -316,7 +340,7 @@ def report(plan, names=None):
         n = n_of(data["spawn"][2], r)
         for b in plan["biomes"]:
             qs, qu, bi = stats_at(plan, data, r, b)
-            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), cap=plan["cap"], seeds=n,
+            row = dict(biome=int(b), name=names.get(int(b), str(b)), radius=int(r), cap=cap_of(plan, b, r), seeds=n,
                        **{k: v for k, v in qs.items() if not k.startswith("_")})
             if qu is not None:
                 row["uniform"] = {k: v for k, v in qu.items() if not k.startswith("_")}; row.update(bi)
@@ -325,7 +349,7 @@ def report(plan, names=None):
                 A, si, _ = data["spawn"]; keep = si < n; A, si = A[keep], si[keep]
                 m = (A[:, 2] == b) & (A[:, 4] == r)
                 D = np.full((n, plan["rays"]), np.inf); D[si[m], A[m, 1]] = A[m, 3]
-                C = plan["cap"]
+                C = cap_of(plan, b, r)
                 row["hazard_bins_far_half"] = ct.bin_hazards(D, C / 2, C, bins=4)
             results.append(row)
             by_r.setdefault(int(r), {})[row["name"]] = dict(lo=row["ED_lo"] - ROUNDING, hi=row["ED_hi"] + ROUNDING)
@@ -372,7 +396,7 @@ def _markdown(cert, plan):
     for r in plan["radii"]:
         rows = [x for x in cert["results"] if x["radius"] == r]
         top = sorted(rows, key=lambda x: -x["ED"])
-        out.append(f"\n## Sight radius {r}, cap {plan['cap']:,} blocks (all {len(top)} biomes, rarest first, most common last)\n\n"
+        out.append(f"\n## Sight radius {r}, cap {plan['cap']:,} blocks, per biome cap 4x its pilot walk (all {len(top)} biomes, rarest first, most common last)\n\n"
                    "| rank | biome | E[D] from spawn | ± ε | guaranteed at least | tail share | from a random start | spawn bias | seeds |"
                    "\n|---|---|---|---|---|---|---|---|---|")
         rank = 1

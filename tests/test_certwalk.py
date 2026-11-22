@@ -235,3 +235,20 @@ def test_ties_where_ranges_overlap():
     R = lambda n, e, lo, hi: dict(name=n, ED=e, ED_lo=lo, ED_hi=hi)
     g = cw.tie_groups([R("a", 100, 95, 105), R("b", 80, 70, 96), R("c", 50, 45, 55), R("d", 30, 28, 32)])
     assert [[x["name"] for x in grp] for grp in g] == [["a", "b"], ["c"], ["d"]]
+
+
+def test_common_biome_gets_a_finite_interval_with_its_own_cap():
+    """Global cap 540k: a biome with E[D] = 1000 never reaches [C/2, C], so T is unbounded. Its own cap fixes that."""
+    rng = np.random.default_rng(9)
+    T = 1000.0
+    pr = cw._sim_priors(T, 540000, J, rng, n=2000)
+    plan = dict(rays=J, cap=540000, caps={"0": 540000}, cap_mult=4.0, alpha_each={"1@0": 1e-8}, n_star={"0": 3000},
+                priors={"1@0": pr}, hash="t")
+    assert cw.cap_of(plan, 1, 0) == 4000
+    bad = 0
+    for _ in range(40):
+        D = rng.exponential(T, (3000, J))
+        q = cw.quantity_from(*arm_stats(D, 4000.0), plan, 1, 0)
+        assert math.isfinite(q["ED_hi"]) and q["rel_half"] < 0.1
+        bad += not (q["ED_lo"] <= T <= q["ED_hi"])
+    assert bad == 0

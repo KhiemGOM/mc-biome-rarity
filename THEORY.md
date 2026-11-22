@@ -583,3 +583,15 @@ The obstacle is $\eta$. A rigorous bound on how fast the climate changes between
 * the resulting bound on the change of continentalness between cells 1 apart is about 4.3, and of weirdness about 5.8, in units where the whole range is about $\pm 1$.
 
 Those bounds are useless: no cell could ever be skipped. The real noise is far smoother than the worst case, but a guarantee must use a provable bound, and the shift noise's high frequency octaves make the global bound loose. A *local* version (interval arithmetic on each octave's actual lattice gradients over a small region, including the shift) might be much tighter. That is a research question, not a known speedup, and the earlier estimate of "5x or more" in chat was not justified.
+
+### 8.8 A cap per biome (added 2026-11-22, before the report)
+
+With one cap $C = 540{,}000$ for every biome, a common biome (say $\mathbb E[D] \approx 1{,}000$) never reaches the far window $[C/2, C]$, so its tail rate has no data and the $H_C$ upper end is $+\infty$, although $S_C$ is tiny. Theorem 18 holds for *any* cap, so each biome may use its own $C_b$.
+
+**Rule.** $C_b = \min\big(C,\ \lceil 4\,\hat\mu_b / 1000 \rceil \cdot 1000\big)$, where $\hat\mu_b$ is the pilot estimate of $\mathbb E[D_b]$ stored in the plan. Bets' prior constants are recomputed from $\hat\mu_b$ and $C_b$ with a fixed random seed.
+
+**Proposition 25 [P | A1, A2].** Theorem 20 holds unchanged with $C_b$ in place of $C$ for every biome.
+
+*Proof.* The rows are exact for every $b$ in the stop set up to $D \le C$ (Proposition 22), hence for every $C_b \le C$. $C_b$ and the bets are functions of the pilot only, which is independent of the production seeds (A1), so conditionally on the pilot every sequence is a valid betting sequence (Theorem 16 and the Corollary of 8.2). The number of sequences and their levels are unchanged. Validity at any stopping time does not depend on which rule stopped the run. $\square$
+
+*Disclosure.* This rule was added after a progress check showed infinite upper ends for common biomes. The rule uses no production data and the same $4\times$ multiplier as the global cap, so the guarantee is unaffected. Every biome now has a planned tail share of about $e^{-4} \approx 1.8\%$.
