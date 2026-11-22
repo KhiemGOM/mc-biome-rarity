@@ -395,7 +395,11 @@ def _markdown(cert, plan):
            f"most {d:g} over the random seeds (1 in {1 / d:,.0f}). Geometry error is 0 and rounding at most ±0.5 blocks "
            f"(both certain, included in ε). The part past the cap rests on the constant hazard assumption and is shown "
            f"as the tail share; the lower end of each range needs no assumption at all.\n",
-           f"Plan `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n"]
+           f"Plan `{cert['plan_hash'][:16]}`, code `{(cert['git'] or '')[:10]}`.\n",
+           ("**Layers (assumption, THEORY.md 8.9):** a biome counts in a 4x4 column if it is at any of the 96 layers from "
+            "y = -64 to 319, so a cave biome counts as found when you pass within the radius of its column, at any depth, "
+            "reachable or not.\n" if plan.get("layers", "surface") == "all" else
+            "**Layers:** surface layer only (no cave biomes).\n")]
     for r in plan["radii"]:
         rows = [x for x in cert["results"] if x["radius"] == r]
         top = sorted(rows, key=lambda x: -x["ED"])
