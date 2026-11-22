@@ -13,5 +13,10 @@
   "seed0": 10000000000,
   "n": 13298,
   "purpose": "certwalk production 602537e6c873 (both arms)"
+ },
+ {
+  "seed0": 11000000000,
+  "n": 3526,
+  "purpose": "certwalk production 7003b065eff1 (both arms)"
  }
 ]

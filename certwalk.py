@@ -308,7 +308,8 @@ def _run_chunk(g, k, s0, radii, log):
 
 def run(plan, log=print):
     for arm in ARMS:
-        os.makedirs(arm_plan(plan, arm)["out"], exist_ok=True)
+        if plan["arm_radii"][arm]:
+            os.makedirs(arm_plan(plan, arm)["out"], exist_ok=True)
     while True:
         g = arm_plan(plan, "uniform"); ms, mu = cr.load_manifest(arm_plan(plan, "spawn")), cr.load_manifest(g)
         for c in ms[len(mu):]:                                     # resume after a crash between the two arms
@@ -499,7 +500,7 @@ def main(argv=None):
         tgt = {int(k): float(v) for k, v in (x.split(":") for x in a.target.split(","))}
         plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, names, None if a.target_biomes == "auto" else [inv[t] for t in a.target_biomes.split(",")],
                          tgt, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.cap_mult, a.uniform_L,
-                         tuple(int(x) for x in a.uniform_radii.split(",")))
+                         tuple(int(x) for x in a.uniform_radii.split(",") if x.strip()))
         lp = os.path.join(ROOT, "out", "certrun", "ledger.json")
         ledger = json.load(open(lp)) if os.path.exists(lp) else []
         nmax = max(plan["n_max"].values())
@@ -522,7 +523,7 @@ def main(argv=None):
         print(open(os.path.join(plan["out"], "report.md")).read())
     else:
         rng = np.random.default_rng()
-        print(json.dumps({arm: verify(plan, arm, a.samples, rng) for arm in ARMS}, indent=1))
+        print(json.dumps({arm: verify(plan, arm, a.samples, rng) for arm in ARMS if plan["arm_radii"][arm]}, indent=1))
 
 
 if __name__ == "__main__":
