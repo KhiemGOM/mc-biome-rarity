@@ -1,0 +1,47 @@
+Game check: xpple/cubiomes 304940b (MC_26_3) vs the Minecraft 26.3 server jar
+(server.jar sha1 33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c, run with OpenJDK 25.0.1)
+Command: java GameCheck 200 5000 2000000 1 > game.txt ; ./gamecheck < game.txt      (3,000,200 lines, 49 s)
+
+N checked 1000000 np_mismatch 51906 biome_mismatch 207
+T checked 2000000 biome_mismatch 955
+S checked 200 spawn_mismatch 126
+
+Breakdown (diagnostic copy of gamecheck.c + TieCheck.java against the game's own parameter list):
+- T: all 955 biome mismatches are exact distance ties (our biome's best fitness == the game's minimum): ties 955, not_ties 0.
+  Most common pair: lush_caves (ours) vs dripstone_caves (game), 824.
+- N biome mismatches: 185 of 207 have bit-identical climate, and all 185 are exact ties. The other 22 have a climate difference (listed below).
+- N climate: 51,906 cells (5.2%) differ by exactly +-1 in at least one quantized parameter.
+  Depth only: 44,178 rows. Index and sign (ours - game): depth +1 43,073; depth -1 1,438; continentalness +-1 915/910;
+  weirdness +-1 871/810; erosion +-1 802/737; temperature +-1 799/762; humidity +-1 546/592. 7,728 rows differ outside depth.
+  Cause: 26.3 evaluates density functions and Perlin noise in float (see Climate_26.3.md).
+- S: 26.3 replaced Climate.Sampler.findSpawnPosition with NoiseSpawnFinder (block coordinates, radial sin/cos search),
+  see NoiseSpawnFinder_26.3.md. Example: seed -8668512467949215094 ours (-80,176) game (-77,190).
+  spawn500 (SpawnDump.java 500 7): 306 of 500 differ.
+- The N line uses the point path (Climate.Sampler.sample). Chunk biomes in the game use the volume path
+  (MultiNoiseBiomeSource.createResolverForChunk). Not yet checked.
+
+The 22 N rows where climate AND biome differ
+(columns: ours, game, our tree on the game's climate point; ours - game per differing index (0 t,1 h,2 c,3 e,4 d,5 w); seed; quart cell):
+N BIOME cold_ocean beach cold_ocean i4 1 | seed 1721942615837299145 q -281 -11 487
+N BIOME snowy_taiga windswept_forest windswept_forest i3 -1 | seed -2882589314290060880 q 104230 24 53501
+N BIOME frozen_ocean lush_caves frozen_ocean i4 1 | seed -5579750919118885469 q 266 -7 -404
+N BIOME forest old_growth_birch_forest forest i1 -1 | seed -7492389086209690162 q -104568 7 -108574
+N BIOME beach ocean beach i4 1 | seed -7492389086209690162 q 46739 15 57438
+N BIOME lukewarm_ocean ocean lukewarm_ocean i4 1 | seed 6822267176175700414 q -48892 33 165256
+N BIOME cold_ocean sulfur_caves sulfur_caves i4 1 | seed 2829248345995683516 q -71028 -5 -208690
+N BIOME dripstone_caves savanna savanna i4 1 | seed -4445687736016301163 q -112 13 -91
+N BIOME frozen_ocean cold_ocean frozen_ocean i4 1 | seed -4214833800498162577 q 221190 33 98096
+N BIOME beach cold_ocean beach i4 1 | seed 1469925921309861039 q -278 1 183
+N BIOME lukewarm_ocean ocean lukewarm_ocean i4 1 | seed 664465988392411016 q 260 33 -270
+N BIOME dripstone_caves dark_forest dark_forest i4 1 | seed 6020620679692283456 q -62 13 -474
+N BIOME beach plains beach i5 1 | seed -5009610649457996257 q -221278 47 -57697
+N BIOME frozen_ocean cold_ocean frozen_ocean i4 1 | seed -7851044526778047909 q 213420 31 132247
+N BIOME lukewarm_ocean ocean lukewarm_ocean i3 -1 | seed -6571251299216828022 q 46428 65 -248617
+N BIOME dripstone_caves desert desert i4 1 | seed -3975948378177963242 q -244 13 6
+N BIOME beach stony_shore beach i4 1 | seed 908800920240022986 q -385 5 341
+N BIOME dripstone_caves mangrove_swamp mangrove_swamp i4 1 | seed 5565958372651049277 q 191909 13 216484
+N BIOME lukewarm_ocean ocean lukewarm_ocean i4 1 | seed 6585178456774979411 q -167689 13 -43230
+N BIOME dripstone_caves desert desert i4 1 | seed 3890895695060983067 q -241684 13 153307
+N BIOME river cold_ocean river i4 1 | seed -4888003033464814834 q 103374 37 113262
+N BIOME dripstone_caves dark_forest dark_forest i4 1 | seed -3002160169930601164 q 347 13 416
+(Where the third column differs from the game's, our tree on the game's exact point still disagrees, which by the T result is a tie.)

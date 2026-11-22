@@ -14,6 +14,8 @@ import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.NoiseSpawnFinder;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
@@ -30,16 +32,19 @@ public class GameCheck {
         SplittableRandom r = new SplittableRandom(Long.parseLong(a[3]));
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-        HolderLookup.Provider reg = VanillaRegistries.createLookup();
+        HolderLookup.Provider reg = VanillaRegistries.createWorldLookup();                     // 26.3: was createLookup()
         NoiseGeneratorSettings ns = reg.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.OVERWORLD).value();
-        HolderGetter<NormalNoise.NoiseParameters> noises = reg.lookupOrThrow(Registries.NOISE);
+        HolderGetter<NormalNoise> noises = reg.lookupOrThrow(Registries.NOISE);                  // 26.3: NormalNoise is the registry type
         Climate.ParameterList<Holder<Biome>> params = reg.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
                 .getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
         PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out), 1 << 20));
         for (int s = 0; s < seeds; s++) {
             long seed = r.nextLong();
-            Climate.Sampler sm = RandomState.create(ns, noises, seed).sampler();
-            BlockPos sp = sm.findSpawnPosition();
+            // 26.3: RandomState.create(noises, seed, settings); the climate sampler and the spawn search take a
+            // SamplerContext, and the spawn search moved to NoiseSpawnFinder with the settings' spawn target points.
+            RandomState rs = RandomState.create(noises, seed, ns);
+            Climate.Sampler sm = rs.createClimateSampler(SamplerContext.EMPTY_UNCACHED);
+            BlockPos sp = NoiseSpawnFinder.findSpawnPosition(ns.spawnTarget(), rs.samplersWithContext(SamplerContext.EMPTY_UNCACHED));
             out.println("S " + seed + " " + sp.getX() + " " + sp.getZ());
             for (int c = 0; c < cells; c++) {
                 int qx, qz;
