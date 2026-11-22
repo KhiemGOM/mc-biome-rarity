@@ -46,6 +46,11 @@ T4 two-phase M_k(all) + [M_1(cal) - M_k(cal)] IS consistent for the exact value 
 T5 constants are measured not assumed. certify.build_terms_stride implements T4 (tested on synthetic worlds).
 
 ## Next steps
+0. CERTIFIED EXACT RUN (supersedes 1-2 below): THEORY.md section 6, certrun.py. The plan is already fixed and committed
+   (out/certrun/plan.json: N = 30,028 seeds x 4 rays from index 9,000,000,000, radii 0,64,128, +-5% target, K = 282, alpha = 0.05).
+   On the many-thread PC: `./build.sh && python3 certrun.py run --threads <T>` (resumable, chunks of 500), then
+   `python3 certrun.py report` and `python3 certrun.py verify --samples 5`. Commit out/certrun/certificate.json and report.md.
+   Do not edit plan.json (the hash check refuses) and do not reuse its seed ranges (ledger.json).
 1. Production exact run (the speed-up the owner wants: run on his PC with many threads):
    `./discexact --seeds 1000 --rays 4 --radii 0,64,128 --seed0 <S> --threads <T> --out out/exact/ex_<S>.csv` in chunks of 100-1000 seeds
    with seed0 offsets so chunks never overlap; fresh seeds (not 7,000,000,000..+600 which the pilot used; use e.g. 9,000,000,000).

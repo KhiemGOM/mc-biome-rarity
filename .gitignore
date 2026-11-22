@@ -19,3 +19,4 @@ out/v/
 out/chk/
 out/cert/*.log
 out/cert/*.time
+out/certrun/pilot/

@@ -1,0 +1,12 @@
+[
+ {
+  "seed0": 8000000000,
+  "n": 200,
+  "purpose": "certrun pilot"
+ },
+ {
+  "seed0": 9000000000,
+  "n": 30028,
+  "purpose": "certrun production e39bbb8c153c"
+ }
+]

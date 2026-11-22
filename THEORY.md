@@ -5,6 +5,7 @@ This document is split in three on purpose.
 1. **The model** (sections 1 and 2): random variables and the estimand, with no reference to code.
 2. **The estimators** (section 3): what converges to what, how fast, and when the confidence interval is valid.
 3. **The code** (section 4): a step by step argument that the programs compute the model's estimator, with every gap named and bounded.
+4. **The certified sampler** (section 6): `certrun.py`, which enforces every hypothesis of a finite N simultaneous guarantee.
 
 Every claim carries one tag.
 
@@ -285,3 +286,57 @@ $$ |\tilde M - M| \le \frac{a + M\,\varepsilon}{\tilde B}, \qquad a = \tfrac12 P
 | Seeds behave as iid uniform | [A] A1, tested by fold chi-square |
 | $M$ is a mean walk beyond 20,000 blocks | [A] H |
 | The model matches the game | [A] section 4.1 item 6 |
+| `certrun.py` intervals all hold at once with prob $\ge 1-\alpha$ at the planned N | [P \| A1, A2] Theorem 13 |
+| `certrun.py` computes those intervals from exactly the planned seeds and the exact model | [P] + [C] section 6.3, re-checked by `verify` |
+
+## 6. The certified sampler (`certrun.py`)
+
+The sampler is built so that every hypothesis of a theorem is enforced by code, not by discipline. It removes the three weaknesses found above: no sparse level is used (only level 1 rows, every cell), the centerline is the exact $r = 0$ model of `discexact` (not the step 1 walk of Proposition 11), and the intervals are valid for the planned $N$, not only as $N \to \infty$.
+
+### 6.1 What is certified
+
+Fix a list of biomes $\mathcal B_0$ (all 94 in `out/names.csv`) and radii $\mathcal R_0$ (default $0, 64, 128$). The $K = |\mathcal B_0|\,|\mathcal R_0|$ quantities are the exact window functionals $M_{b,r}$ of section 1.3. For each, the report gives $C_{b,r}$, the empirical Bernstein set of Theorem 9 at level $\alpha/K$, computed from the production seeds.
+
+**Theorem 13 [P | A1, A2] (simultaneous coverage for the planned N).** Let the pilot use seed indices $I_p$ and production use $I = \{s_0, \dots, s_0 + N - 1\}$ with $I \cap I_p = \emptyset$, and let $N$ be any function of the pilot data. Then
+
+$$ P\big(M_{b,r} \in C_{b,r} \text{ for all } (b, r) \in \mathcal B_0 \times \mathcal R_0\big) \ge 1 - \alpha. $$
+
+*Proof.* Under A1 the seeds with indices in $I_p$ and in $I$ are independent, so conditionally on the pilot data $N$ is a constant and the production pairs $(X_i, E_i)_{i \in I}$ are still iid with the unconditional law. Theorem 9 at level $\alpha/K$ applies to each $(b, r)$ conditionally on the pilot; the union bound over the $K$ failure events gives $\ge 1 - \alpha$ conditionally, hence unconditionally. If $\mathbb E[E] = 0$ for some $(b, r)$ the data have no events, the set is $[0, \infty)$ and the claim is vacuous rather than false (convention $M = \infty$). $\square$
+
+A3 is not needed: a biome with too few events gets an unbounded interval, which is correct, not an error.
+
+**Corollary 14 [P | A1, A2] (certified ranking).** On the event of Theorem 13, $\inf C_{a,r} > \sup C_{b,r}$ implies $M_{a,r} > M_{b,r}$. So all orders listed in `certified_order` hold simultaneously with probability $\ge 1 - \alpha$, with no further multiplicity correction (they are consequences of the one event).
+
+What Theorem 13 does not need: H, the Steiner model, F, or "N large". What it still needs: A1 and A2 (section 3.1), and the definition of the model (section 4.1 item 6). Under H, each certified $M$ is also a certified mean extra walk; without H it is a certified inverse hazard on the window.
+
+### 6.2 Planning (affects only the width, never the coverage)
+
+From a pilot, the half width of $C$ at $N$ seeds is predicted by solving $|\bar Z_N(m)| = \text{bound}(m)$ near $\hat M$:
+
+$$ \frac{\text{half width}}{\hat M} \approx \frac{\sqrt{2 V \ell / N} + 7 J (R - R_0 + \hat M)\,\ell / (3(N-1))}{\bar E\,\hat M}, \qquad \ell = \ln(4K/\alpha), $$
+
+with $V$, $\bar E$, $\hat M$ from the pilot. `required_N` takes the smallest $N$ meeting the target for every target biome and radius, times 1.10. Because $N$ depends only on pilot seeds, Theorem 13 holds whatever the pilot says; a noisy pilot can only make the final interval wider or narrower than planned.
+
+**[E] The committed plan** (`out/certrun/plan.json`): pilot on seed indices $8\times10^9, \dots, 8\times10^9 + 199$; target $\pm 5\%$ for the six rare biomes at every radius, $K = 282$, $\alpha = 0.05$ (so $\alpha/K = 1.8\times10^{-4}$ each). Required $N$ ranges from 8,817 (stony peaks, $r = 128$) to 30,028 (mushroom fields, $r = 0$); the plan fixes $N = 30{,}028$ seeds $\times$ 4 rays on indices from $9\times10^9$. At 1.15 s CPU per ray (all three radii together) that is about 38 CPU hours: about 2.4 hours on 16 threads. The finite $N$ guarantee costs about $1.7\times$ the width of the asymptotic interval per quantity and a further factor $\sqrt{\ln(4K/\alpha)/\ln(4/\alpha)} \approx 1.5$ for simultaneity over 282 quantities, hence the larger $N$ than the earlier $\pm 2\%$ single-biome asymptotic plan.
+
+### 6.3 The code computes Theorem 13's sets
+
+| step | code | why it is the model |
+|---|---|---|
+| seeds | `seed_of` (Python splitmix64), `check_integrity` | the report recomputes every planned seed and refuses unless the data contain exactly those seeds: so the data are $S_{s_0}, \dots, S_{s_0 + N - 1}$ with the planned $N$, no duplicates, no extra or missing seeds, no optional stopping. The end to end test confirms Python and C produce the same seeds |
+| fresh seeds | `check_fresh`, `ledger.json`, `HISTORICAL` | planning refuses any production or pilot range overlapping an earlier one (both historical runs are listed), which is the hypothesis $I \cap I_p = \emptyset$ |
+| plan fixed | `plan_hash` | `run` and `report` refuse a `plan.json` edited after planning; `plan` refuses to overwrite an existing plan |
+| complete files | spawn row check | the spawn cell is always visible ($\rho = 0 \le r$), so every (seed, ray, radius) has a row with $D = 0$; a missing one proves a truncated or foreign file |
+| exact model | `load_csv` keeps `level == 1` | every cell; $r = 0$ is the exact centerline (Lemma 3, section 4 rows 5 to 11) |
+| censoring | `report` requires `rmax == R` | section 4 row 11 |
+| $(X_i, E_i)$ | `per_seed_EX` | rows are found rays; a missing ray is $D = \infty$, contributing $x = R - R_0$, $e = 0$. Equal to `certify.stats` on the dense matrix (`test_per_seed_EX_matches_dense_stats`) |
+| $C_{b,r}$ | `interval` = `theory.eb_ratio_ci` at `alpha / K` | Theorem 9, exact bisection (section 3.4) |
+| ranking | `certified_order` | Corollary 14 (`test_ordering_needs_disjoint_intervals`) |
+
+**Independent re-derivation on production rays (`certrun.py verify`).** For random production (seed, ray) pairs it reruns `discexact --debug`, which prints every enumerated cell with its biome and $D$ per radius, and then, in Python code that shares nothing with `discexact.c`:
+
+1. recomputes $D(Q_q, r)$ for every printed cell with `theory.cell_D` (tested against brute force minimisation);
+2. builds its own superset of the cells within $r_{\max}$ of the segment and checks that every one with finite $D$ was enumerated by C. The superset is complete because a point $y$ within $r$ of the segment has a nearest segment point $L(s)$ with $|y_x - L(s)_x| \le r$ and $|y_z - L(s)_z| \le r$, so $s$ lies in the parameter range where the line is within $r$ of the cell's column, and $y_z$ lies within $r$ of the line's $z$ values on that range (plus one cell of margin on each side);
+3. takes the per biome minimum, rounds it, and checks it equals the production row.
+
+**[E] On the pilot:** 4 rays, 1,311,096 cells, largest $|D_{\rm C} - D_{\rm Python}| = 5\times10^{-7}$ (the C debug output prints 6 decimals), 0 missing cells, 0 row mismatches. Running `verify` on a few production rays after the run turns the code to model argument of section 4 into a check on the very data being certified.
