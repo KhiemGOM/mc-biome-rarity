@@ -330,3 +330,13 @@ def test_spawn_only_extension_end_to_end(tmp_path):
     for x in r0:
         assert x["bias_A_lo"] <= x["bias_A"] <= x["bias_A_hi"]
     assert "(6 random start, bias on those)" in open(os.path.join(plan["out"], "report.md")).read()
+
+
+def test_until_fast_path_matches_active_radii(monkeypatch):
+    """run's count-only shortcut picks exactly what active_radii picks while every radius is below until."""
+    plan = dict(radii=[0, 64], n_max={"0": 10, "64": 4}, chunk=2, target_biomes=[1], target={"0": 0.1, "64": 0.1})
+    monkeypatch.setattr(cw, "stats_at", lambda *a: (dict(rel_half=0.01), None, None))
+    for man in ([dict(radii=[0, 64], n=2)], [dict(radii=[0, 64], n=2), dict(radii=[0, 64], n=2)]):
+        until = 8
+        fast = [r for r in man[-1]["radii"] if cw.n_of(man, r) < cw.limit_of(plan, r)]
+        assert fast == cw.active_radii(plan, {"spawn": (None, None, man)}, until)

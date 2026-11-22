@@ -360,11 +360,16 @@ def run(plan, log=print, until=None):
             ur = [r for r in c["radii"] if r in plan["arm_radii"]["uniform"] and c["seed0"] - plan["seed0"] < plan["n_max"][str(r)]]
             if ur:
                 _run_chunk(g, c["k"], c["seed0"], ur, log)
-        data = {arm: load_arm(plan, arm) for arm in ARMS}
-        act = active_radii(plan, data, until)
+        last = ms[-1]["radii"] if ms else []
+        if until is not None and last and all(n_of(ms, r) < until for r in last):
+            # every radius is below until, so active_radii decides from seed counts alone: skip reloading the chunks
+            act, k = [r for r in last if n_of(ms, r) < limit_of(plan, r)], len(ms)
+        else:
+            data = {arm: load_arm(plan, arm) for arm in ARMS}
+            act = active_radii(plan, data, until)
+            k = len(data["spawn"][2]) if data["spawn"] else 0
         if not act:
             log("done"); return
-        k = len(data["spawn"][2]) if data["spawn"] else 0
         s0 = plan["seed0"] + k * plan["chunk"]
         _run_chunk(arm_plan(plan, "spawn"), k, s0, act, log)
         ur = [r for r in act if r in plan["arm_radii"]["uniform"] and s0 - plan["seed0"] < plan["n_max"][str(r)]]
