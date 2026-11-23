@@ -205,7 +205,7 @@ def _origin(plan):
     st = plan.get("stopset")
     lay = plan.get("layers", "surface")
     return (([] if o == "spawn" else ["--origin", o]) + ([] if not st else ["--stopset", ",".join(map(str, st))])
-            + ([] if lay == "surface" else ["--layers", lay]))
+            + ([] if lay == "surface" else ["--layers", lay]) + (["--ties", "1"] if plan.get("ties") else []))
 
 
 def discexact(seed0, n, radii, plan, out):

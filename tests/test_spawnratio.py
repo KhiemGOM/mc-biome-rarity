@@ -55,7 +55,7 @@ def _fake(monkeypatch, tmp_path, n=4000, J=1):
         for b, p in pa.items():
             D = np.where(rng.random((n, J)) < p, 0.0, rng.exponential(300, (n, J)).round() + 1)
             A, si = _rows(D, b); parts.append(A); sis.append(si)
-        arms[arm] = (np.concatenate(parts), np.concatenate(sis), [dict(k=0, n=n, radii=[0], seed0=0)])
+        arms[arm] = ({"hf": np.concatenate(parts)}, {"hf": np.concatenate(sis)}, [dict(k=0, n=n, radii=[0], seed0=0)])
     monkeypatch.setattr(sr.cw, "load_arm", lambda plan, arm: arms[arm])
     return dict(rays=J, cap=10000, biomes=[1, 2], names={"1": "plains", "2": "mushroom"}, radii=[0],
                 arm_radii={"spawn": [0], "uniform": [0]}, out=str(tmp_path), hash="h" * 16)

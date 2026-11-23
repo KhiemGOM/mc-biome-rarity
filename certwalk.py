@@ -139,6 +139,40 @@ REACH = 256                 # discexact row marker: per (seed, ray, radius) the 
 # 26.3 tie sandwich rows (discexact, only where they differ from the hint-free row of the same biome b):
 TIE_ANY = 512               # biome b + 512: D_any, first hit where b is in the argmin set T(p) (D_any <= D_game)
 TIE_STRICT = 1024           # biome b + 1024: D_strict, first hit where T(p) = {b} (D_strict >= D_game); dist -1 = never
+VIEWS = ("hf", "any", "strict")
+
+
+def seqs(plan):
+    """Confidence sequences per (biome, radius). With tie rows every A, S, T and the paired bias run on the any and on
+    the strict view (Lemma 30), so twice as many."""
+    return SEQS * (2 if plan.get("ties") else 1)
+
+
+def tview(A, kind):
+    """Rows of one view. hf: the hint free rows as written. any / strict: each biome's row replaced by its D_any /
+    D_strict row where one exists (discexact writes those only where they differ). D_strict = -1 (never the only
+    member within the scanned reach) drops the row, i.e. it reads as D > cap: that only raises D, so an upper bound
+    stays valid (THEORY.md 0.1, Lemma 30)."""
+    base = A[A[:, 2] < TIE_ANY]
+    if kind == "hf":
+        return base
+    off = TIE_ANY if kind == "any" else TIE_STRICT
+    T = A[(A[:, 2] >= off) & (A[:, 2] < off + 256)].copy()
+    if T.shape[0] == 0:
+        return base
+    T[:, 2] -= off
+    X = np.concatenate([T, base]); pri = np.concatenate([np.zeros(T.shape[0], np.int8), np.ones(base.shape[0], np.int8)])
+    o = np.lexsort((pri, X[:, 4], X[:, 2], X[:, 1], X[:, 0]))
+    X, pri = X[o], pri[o]
+    k = X[:, [0, 1, 2, 4]]
+    first = np.ones(X.shape[0], bool); first[1:] = (k[1:] != k[:-1]).any(1)
+    X = X[first]
+    return X[X[:, 3] >= 0]
+
+
+def never_strict(A):
+    """Tie rows with D_strict = -1 (strict never reached within the reach): reported, expected 0."""
+    return int(((A[:, 2] >= TIE_STRICT) & (A[:, 3] < 0)).sum())
                             # the only member within the scanned reach. Column mode: per layer, united over the layers.
 
 
@@ -147,7 +181,7 @@ def arm_plan(plan, arm):
     return dict(seed0=plan["seed0"], rays=plan["rays"], radii=list(plan["arm_radii"][arm]), rmax=int(plan["cap"]),
                 R0=0.0, R=float(plan["cap"]), chunk=plan["chunk"], threads=plan.get("threads", 1),
                 origin="spawn" if arm == "spawn" else f"uniform:{int(plan['uniform_L'])}", stopset=plan["biomes"],
-                layers=plan.get("layers", "surface"), out=os.path.join(plan["out"], arm))
+                layers=plan.get("layers", "surface"), ties=bool(plan.get("ties")), out=os.path.join(plan["out"], arm))
 
 
 def reach_cost(T_targets, C, r, rng, n=20000):
@@ -157,7 +191,7 @@ def reach_cost(T_targets, C, r, rng, n=20000):
 
 
 def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alpha, alpha_rest, seed0, chunk, out,
-              cap_mult=4.0, uniform_L=1_000_000, uniform_radii=(0,), layers="surface"):
+              cap_mult=4.0, uniform_L=1_000_000, uniform_radii=(0,), layers="surface", ties=False):
     """target: {radius: relative half width}. The stop set is every biome seen in the pilot (it must be found or
     capped before a ray stops, so every one of them gets exact rows). cap = cap_mult x the largest target E[D]."""
     rng = np.random.default_rng(12345)
@@ -180,7 +214,8 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alph
     priors = {qkey(b, r): _sim_priors(min(T_hat[qkey(b, r)], 50 * cap), cap, rays, rng) for r in radii for b in biomes}
     tq = [qkey(b, r) for r in radii for b in targets]
     rest = [qkey(b, r) for r in radii for b in biomes if qkey(b, r) not in tq]
-    a_t, a_r = (alpha - alpha_rest) / (SEQS * len(tq)), alpha_rest / (SEQS * max(len(rest), 1))
+    ns_ = SEQS * (2 if ties else 1)
+    a_t, a_r = (alpha - alpha_rest) / (ns_ * len(tq)), alpha_rest / (ns_ * max(len(rest), 1))
     aeach = {q: (a_t if q in tq else a_r) for q in tq + rest}
     n_star, reach = {}, {}
     for r in radii:
@@ -207,6 +242,20 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alph
                 pilot=dict(seed0=pilot_seed0, n=n_pilot), out=out)
     if layers != "surface":
         plan["layers"] = layers
+    if ties:
+        plan["ties"] = True
+    plan["hash"] = plan_hash(plan)
+    return plan
+
+
+def fix_n(plan, nfix):
+    """One shot plan: every radius runs exactly nfix[r] seeds (n_star tunes the bets to that n). Done at planning,
+    before any production seed, so it is a fixed sample size (Theorem 20 holds at any fixed n)."""
+    if set(nfix) != set(plan["radii"]):
+        raise ValueError("--n-fixed must give every radius")
+    for r, v in nfix.items():
+        plan["n_star"][str(r)] = plan["n_max"][str(r)] = int(v)
+    plan["fixed"] = True
     plan["hash"] = plan_hash(plan)
     return plan
 
@@ -214,14 +263,14 @@ def make_plan(P, pilot_seed0, n_pilot, rays, radii, names, targets, target, alph
 def plan_hash(plan):
     import hashlib
     keys = ["seed0", "rays", "uniform_L", "radii", "cap", "caps", "chunk", "alpha", "alpha_rest", "biomes", "target_biomes",
-            "target", "alpha_each", "priors", "n_star", "n_max", "arm_radii"] + (["layers"] if "layers" in plan else [])
+            "target", "alpha_each", "priors", "n_star", "n_max", "arm_radii"] + (["layers"] if "layers" in plan else []) + (["ties"] if "ties" in plan else []) + (["fixed"] if "fixed" in plan else [])
     return hashlib.sha256(json.dumps({k: plan[k] for k in keys}, sort_keys=True).encode()).hexdigest()
 
 
 def check_alpha(plan):
     n_q = len(plan["biomes"]) * len(plan["radii"])
-    if len(plan["alpha_each"]) != n_q or SEQS * sum(plan["alpha_each"].values()) > plan["alpha"] * (1 + 1e-9):
-        raise ValueError(f"alpha_each must cover every (biome, radius); {SEQS} sequences each must sum to at most alpha")
+    if len(plan["alpha_each"]) != n_q or seqs(plan) * sum(plan["alpha_each"].values()) > plan["alpha"] * (1 + 1e-9):
+        raise ValueError(f"alpha_each must cover every (biome, radius); {seqs(plan)} sequences each must sum to at most alpha")
 
 
 # ------------------------------------------------------------------ data: early stop integrity (THEORY.md 8.7)
@@ -254,7 +303,13 @@ def load_arm(plan, arm):
     for c in man:
         m = (si >= i) & (si < i + c["n"])
         check_reach(A[m], c["n"], plan["rays"], c["radii"], plan["biomes"], plan["cap"]); i += c["n"]
-    return A, si, man
+    if not plan.get("ties"):
+        return {"hf": A}, {"hf": si}, man
+    X = np.column_stack([A, si])                 # the seed index rides along as the last column
+    V, S = {}, {}
+    for v in VIEWS:
+        Y = tview(X, v); V[v] = Y[:, :-1]; S[v] = Y[:, -1]
+    return V, S, man
 
 
 def n_of(man, r):
@@ -295,24 +350,66 @@ def reserve_extension(plan, n, ledger_path):
     return ext
 
 
+def views_of(plan, A):
+    """{view: rows}. Without tie rows only the hint free view exists."""
+    if not plan.get("ties"):
+        return {"hf": A}
+    return {v: tview(A, v) for v in VIEWS}
+
+
+def quantity_t(V, si, n, plan, b, r):
+    """One arm. Without ties: Theorem 20 on the rows. With ties: the point estimate from the hint free rows, the
+    lower ends from the any view and the upper ends from the strict view (Lemma 30: D_any <= D_game <= D_strict).
+    The sub results stay under _any / _strict for the paired bias and order."""
+    q = quantity(V["hf"], si["hf"], n, plan, b, r)
+    if "any" not in V:
+        return q
+    qa = quantity(V["any"], si["any"], n, plan, b, r)
+    qs = quantity(V["strict"], si["strict"], n, plan, b, r)
+    lo, hi, ED = qa["ED_lo"], qs["ED_hi"], q["ED"]
+    q.update(ED_lo=lo, ED_hi=hi, ED_lower_no_assumption=qa["A_lo"], A_lo=qa["A_lo"], A_hi=qs["A_hi"],
+             S_lo=qa["S_lo"], S_hi=qs["S_hi"], T_lo=qa["T_lo"], T_hi=qs["T_hi"],
+             ED_any=qa["ED"], ED_strict=qs["ED"], A_any=qa["A"], A_strict=qs["A"],
+             rel_half=(hi - lo) / 2 / ED if math.isfinite(hi) and ED > 0 else math.inf,
+             eps_MC=max(ED - lo, hi - ED), _any=qa, _strict=qs)
+    return q
+
+
+def _cut(V, si, n):
+    keep = {v: si[v] < n for v in V}
+    return {v: V[v][keep[v]] for v in V}, {v: si[v][keep[v]] for v in V}
+
+
 def stats_at(plan, data, r, b):
     """(spawn quantity, uniform quantity or None, bias or None) for (b, r) on the seeds both arms share."""
-    A, si, man = data["spawn"]; n = n_of(man, r)
-    keep = si < n
-    qs = quantity(A[keep], si[keep], n, plan, b, r)
+    V, si, man = data["spawn"]; n = n_of(man, r)
+    Vk, sk = _cut(V, si, n)
+    qs = quantity_t(Vk, sk, n, plan, b, r)
     if r not in plan["arm_radii"]["uniform"] or data.get("uniform") is None:
         return qs, None, None
-    Au, siu, manu = data["uniform"]; nu = n_of(manu, r)
+    Vu, siu, manu = data["uniform"]; nu = n_of(manu, r)
     if nu > n:
         raise ValueError(f"r={r}: uniform arm has more seeds than the spawn arm ({nu} vs {n})")
-    keep = siu < nu
-    qu = quantity(Au[keep], siu[keep], nu, plan, b, r)
+    Vuk, suk = _cut(Vu, siu, nu)
+    qu = quantity_t(Vuk, suk, nu, plan, b, r)
     qu["seeds"] = nu
     if nu == n:
-        return qs, qu, bias(qs, qu, plan, b, r, n)
-    keep = si < nu                    # paired bias on the seeds both arms share
-    qp = quantity(A[keep], si[keep], nu, plan, b, r)
-    return qs, qu, bias(qp, qu, plan, b, r, nu)
+        return qs, qu, bias_t(qs, qu, plan, b, r, n)
+    Vp, sp = _cut(V, si, nu)          # paired bias on the seeds both arms share
+    qp = quantity_t(Vp, sp, nu, plan, b, r)
+    return qs, qu, bias_t(qp, qu, plan, b, r, nu)
+
+
+def bias_t(qs, qu, plan, b, r, n):
+    """Spawn bias. With ties: lower end from (spawn any) - (uniform strict), upper end from (spawn strict) -
+    (uniform any), each a paired sequence; the point estimate is hint free."""
+    if "_any" not in qs:
+        return bias(qs, qu, plan, b, r, n)
+    lo_ = bias(qs["_any"], qu["_strict"], plan, b, r, n)
+    hi_ = bias(qs["_strict"], qu["_any"], plan, b, r, n)
+    d = qs["ED"] - qu["ED"]
+    return dict(bias=d, bias_A=qs["A"] - qu["A"], bias_A_lo=lo_["bias_A_lo"], bias_A_hi=hi_["bias_A_hi"],
+                bias_lo=lo_["bias_lo"], bias_hi=hi_["bias_hi"], bias_rel=d / qu["ED"] if qu["ED"] > 0 else math.nan)
 
 
 def active_radii(plan, data, until=None):
@@ -329,6 +426,10 @@ def active_radii(plan, data, until=None):
             continue
         if until is not None and n < until:
             out.append(r); continue
+        if plan.get("fixed"):            # one shot: the seed count was fixed in the plan, nothing is decided from data
+            if until is None or n < min(until, limit_of(plan, r)):
+                out.append(r)
+            continue
         if n < plan["chunk"]:
             out.append(r); continue
         for b in plan["target_biomes"]:
@@ -400,7 +501,7 @@ def report(plan, names=None):
                 row["uniform"] = {k: v for k, v in qu.items() if not k.startswith("_")}; row.update(bi)
             if int(b) in plan["target_biomes"]:
                 row["target_met"] = bool(qs["rel_half"] <= plan["target"][str(r)])
-                A, si, _ = data["spawn"]; keep = si < n; A, si = A[keep], si[keep]
+                A, si, _ = data["spawn"]; A, si = A["hf"], si["hf"]; keep = si < n; A, si = A[keep], si[keep]
                 m = (A[:, 2] == b) & (A[:, 4] == r)
                 D = np.full((n, plan["rays"]), np.inf); D[si[m], A[m, 1]] = A[m, 3]
                 C = cap_of(plan, b, r)
@@ -415,7 +516,11 @@ def report(plan, names=None):
                            f"error 0, rounding at most 0.5 blocks (included). Random part: except with chance at most "
                            f"{plan['alpha']:g} over the seeds (A1, A2), every range below holds at once (Theorem 20). "
                            f"The lower end of every E[D] range needs nothing more; the upper end also uses H_C (constant "
-                           f"hazard from C/2 on), which affects only the tail share."))
+                           f"hazard from C/2 on), which affects only the tail share."
+                           + (" Biome ties: the game's pick at an exact climate tie depends on its lookup history, so "
+                              "every range is taken from the earliest possible hit (lower end) to the latest possible "
+                              "hit (upper end) (Lemma 30), and holds whatever the game picks; the estimate uses the "
+                              "fixed hint free rule." if plan.get("ties") else "")))
     with open(os.path.join(plan["out"], "certificate.json"), "w") as f:
         json.dump(cert, f, indent=1, default=float)
     with open(os.path.join(plan["out"], "report.md"), "w") as f:
@@ -442,34 +547,40 @@ def pair_order(plan, alpha_pair, names=None, radii=None, log=None):
     data = load_arm(plan, "spawn")
     if data is None:
         raise ValueError("no chunk in the manifest")
-    A0, si0, man = data
+    V0, S0, man = data
+    tied = "any" in V0
     J, bs = plan["rays"], [int(b) for b in plan["biomes"]]
     radii = list(plan["radii"]) if radii is None else radii
     npairs = len(bs) * (len(bs) - 1) // 2
-    a_each = alpha_pair / (npairs * len(plan["radii"]))
+    # with ties each pair has two one sided uses of two sequences: lower from (a any - b strict), upper from
+    # (a strict - b any), Lemma 30; so twice as many sequences
+    a_each = alpha_pair / ((2 if tied else 1) * npairs * len(plan["radii"]))
     out = dict(plan_hash=plan_hash(plan), alpha=plan["alpha"], alpha_pair=alpha_pair, alpha_each_pair=a_each, radii={})
     for r in radii:
-        n = n_of(man, r); keep = si0 < n; A, si = A0[keep], si0[keep]
+        n = n_of(man, r); Vk, Sk = _cut(V0, S0, n)
         inc = np.ones(n, bool)
-        W, Q = {}, {}
-        for b in bs:
-            C = cap_of(plan, b, r)
-            Wb, Kb, Eb, Xb = walk_terms(A, si, n, J, b, r, C)
-            W[b] = Wb; Q[b] = quantity_from(Wb, Kb, Eb, Xb, plan, b, r)
+        W, Q = {v: {} for v in Vk}, {v: {} for v in Vk}
+        for v in Vk:
+            for b in bs:
+                C = cap_of(plan, b, r)
+                Wb, Kb, Eb, Xb = walk_terms(Vk[v], Sk[v], n, J, b, r, C)
+                W[v][b] = Wb; Q[v][b] = quantity_from(Wb, Kb, Eb, Xb, plan, b, r)
+        lov, hiv = ("any", "strict") if tied else ("hf", "hf")
+        Qp = Q["hf"]
         pairs = []
         for i, a in enumerate(bs):
             for b in bs[i + 1:]:
                 Ca, Cb = cap_of(plan, a, r), cap_of(plan, b, r)
                 Ta, Tb = plan["priors"][qkey(a, r)]["T_hat"], plan["priors"][qkey(b, r)]["T_hat"]
                 pr = _pair_prior(Ta, Ca, Tb, Cb, J, 7919 * a + 104729 * b + int(r))
-                V = W[a] - W[b] + J * Cb
-                lo, hi = th.BettingCS(J * inc.astype(float), V, J, 0.0, float(Ca + Cb), a_each, plan["n_star"][str(r)],
-                                      *pr, include=inc).interval()
-                qa, qb = Q[a], Q[b]
+                cs = lambda V: th.BettingCS(J * inc.astype(float), V, J, 0.0, float(Ca + Cb), a_each, plan["n_star"][str(r)],
+                                            *pr, include=inc).interval()
+                lo = cs(W[lov][a] - W[hiv][b] + J * Cb)[0]
+                hi = cs(W[hiv][a] - W[lov][b] + J * Cb)[1]
                 tail = lambda S, T: S * T if S > 0 else 0.0
-                d_lo = (lo - Cb) + tail(qa["S_lo"], qa["T_lo"]) - tail(qb["S_hi"], qb["T_hi"]) - 2 * ROUNDING
-                d_hi = (hi - Cb) + tail(qa["S_hi"], qa["T_hi"]) - tail(qb["S_lo"], qb["T_lo"]) + 2 * ROUNDING
-                pairs.append(dict(a=a, b=b, diff=qa["ED"] - qb["ED"], lo=float(d_lo), hi=float(d_hi),
+                d_lo = (lo - Cb) + tail(Q[lov][a]["S_lo"], Q[lov][a]["T_lo"]) - tail(Q[hiv][b]["S_hi"], Q[hiv][b]["T_hi"]) - 2 * ROUNDING
+                d_hi = (hi - Cb) + tail(Q[hiv][a]["S_hi"], Q[hiv][a]["T_hi"]) - tail(Q[lov][b]["S_lo"], Q[lov][b]["T_lo"]) + 2 * ROUNDING
+                pairs.append(dict(a=a, b=b, diff=Qp[a]["ED"] - Qp[b]["ED"], lo=float(d_lo), hi=float(d_hi),
                                   dA_lo=float(lo - Cb), dA_hi=float(hi - Cb)))
         rarer = {b: set() for b in bs}                    # rarer[x] = biomes certified rarer than x
         for p in pairs:
@@ -477,8 +588,8 @@ def pair_order(plan, alpha_pair, names=None, radii=None, log=None):
             elif p["hi"] < 0: rarer[p["a"]].add(p["b"])
         commoner = {b: {x for x in bs if b in rarer[x]} for b in bs}
         rows = []
-        for b in sorted(bs, key=lambda x: -Q[x]["ED"]):
-            rows.append(dict(biome=b, name=names.get(b, str(b)), ED=Q[b]["ED"], ED_lo=Q[b]["ED_lo"], ED_hi=Q[b]["ED_hi"],
+        for b in sorted(bs, key=lambda x: -Qp[x]["ED"]):
+            rows.append(dict(biome=b, name=names.get(b, str(b)), ED=Qp[b]["ED"], ED_lo=Q[lov][b]["ED_lo"], ED_hi=Q[hiv][b]["ED_hi"],
                              rank_lo=1 + len(rarer[b]), rank_hi=len(bs) - len(commoner[b]),
                              unresolved=[names.get(x, str(x)) for x in bs if x != b and x not in rarer[b] and x not in commoner[b]]))
         out["radii"][str(r)] = dict(seeds=n, pairs=pairs, ranks=rows)
@@ -573,7 +684,7 @@ def verify(plan, arm, samples=3, rng=None):
     import subprocess
     rng = rng or np.random.default_rng()
     data = load_arm(plan, arm)
-    A, si, man = data
+    A, si, man = data; A, si = A["hf"], si["hf"]
     J = plan["rays"]; n_total = sum(c["n"] for c in man)
     g = arm_plan(plan, arm)
     st = dict(rays_checked=0, cells_checked=0, max_abs_D_err=0.0, rows_mismatch=0, rows_checked=0)
@@ -605,7 +716,7 @@ def verify(plan, arm, samples=3, rng=None):
             want = {}
             for b, d in zip(bio[fin], Dc[fin, j]):
                 di = int(math.floor(d + 0.5)); want[int(b)] = min(want.get(int(b), di), di)
-            rr = rows[(rows[:, 4] == r) & (rows[:, 2] != REACH)]
+            rr = rows[(rows[:, 4] == r) & (rows[:, 2] < REACH)]
             got = {int(b): int(d) for b, d in rr[:, [2, 3]]}
             rho = reach[int(r)]
             for b in set(want) | set(got):
@@ -633,6 +744,8 @@ def main(argv=None):
     ap.add_argument("--target", default="0:0.05,64:0.10,128:0.10", help="radius:relative half width,...")
     ap.add_argument("--cap-mult", type=float, default=4.0)
     ap.add_argument("--uniform-radii", default="0")
+    ap.add_argument("--n-fixed", default=None, help="one shot: radius:seeds,... fixes n_max = n_star = seeds and stops exactly there")
+    ap.add_argument("--ties", type=int, default=0, help="1: record D_any / D_strict rows and certify the game value through Lemma 30 (26.3)")
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--alpha-rest", type=float, default=0.005)
     ap.add_argument("--target-biomes", default="auto", help="names, or auto = the 8 rarest in the pilot at each radius")
@@ -662,7 +775,9 @@ def main(argv=None):
         tgt = {int(k): float(v) for k, v in (x.split(":") for x in a.target.split(","))}
         plan = make_plan(P, a.pilot_seed0, a.pilot_seeds, a.rays, radii, names, None if a.target_biomes == "auto" else [inv[t] for t in a.target_biomes.split(",")],
                          tgt, a.alpha, a.alpha_rest, a.seed0, a.chunk, os.path.relpath(a.out, ROOT), a.cap_mult, a.uniform_L,
-                         tuple(int(x) for x in a.uniform_radii.split(",") if x.strip()), a.layers)
+                         tuple(int(x) for x in a.uniform_radii.split(",") if x.strip()), a.layers, bool(a.ties))
+        if a.n_fixed:
+            fix_n(plan, {int(k): int(v) for k, v in (x.split(":") for x in a.n_fixed.split(","))})
         lp = os.path.join(ROOT, "out", "certrun", "ledger.json")
         ledger = json.load(open(lp)) if os.path.exists(lp) else []
         nmax = max(plan["n_max"].values())

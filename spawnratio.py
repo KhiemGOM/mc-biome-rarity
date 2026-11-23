@@ -59,7 +59,8 @@ def analyse(plan, xs=XS, alpha=1e-6, pilot=None, r=0):
     J, B = plan["rays"], plan["biomes"]
     ns = {arm: cw.n_of(data[arm][2], r) for arm in ("spawn", "uniform")}   # each arm on its own seeds (separate sequences)
     n = ns["spawn"]
-    a_each = alpha / (2 * len(B) * len(xs))
+    tied = "any" in data["spawn"][0]
+    a_each = alpha / ((4 if tied else 2) * len(B) * len(xs))   # with ties: one sided use of a strict and an any sequence
     pri = _pilot_priors(pilot, B, xs, r)
     names = {int(k): v for k, v in plan.get("names", {}).items()}
     rows = []
@@ -67,9 +68,14 @@ def analyse(plan, xs=XS, alpha=1e-6, pilot=None, r=0):
         for x in xs:
             out = {}
             for arm in ("spawn", "uniform"):
-                A, si, _ = data[arm]; na = ns[arm]; keep = si < na
-                Y = counts(A[keep], si[keep], na, J, b, r, x)
-                lo, hi = prob_cs(Y, J, a_each, pri.get((b, x), 0.05))
+                V, S, _ = data[arm]; na = ns[arm]
+                cnt = lambda v: counts(V[v][S[v] < na], S[v][S[v] < na], na, J, b, r, x)
+                Y = cnt("hf")
+                if tied:        # {D_strict <= x} <= {D_game <= x} <= {D_any <= x} (Lemma 30)
+                    lo = prob_cs(cnt("strict"), J, a_each, pri.get((b, x), 0.05))[0]
+                    hi = prob_cs(cnt("any"), J, a_each, pri.get((b, x), 0.05))[1]
+                else:
+                    lo, hi = prob_cs(Y, J, a_each, pri.get((b, x), 0.05))
                 out[arm] = dict(hits=int(Y.sum()), F=float(Y.sum()) / (na * J), lo=lo, hi=hi)
             s, u = out["spawn"], out["uniform"]
             lo, hi = ratio_bounds(s["lo"], s["hi"], u["lo"], u["hi"])

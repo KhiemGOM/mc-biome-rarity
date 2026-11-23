@@ -340,3 +340,53 @@ def test_until_fast_path_matches_active_radii(monkeypatch):
         until = 8
         fast = [r for r in man[-1]["radii"] if cw.n_of(man, r) < cw.limit_of(plan, r)]
         assert fast == cw.active_radii(plan, {"spawn": (None, None, man)}, until)
+
+
+# ---------------------------------------------------------------- biome ties (THEORY.md 0.1, Lemma 30)
+def test_tview_replaces_only_the_differing_rows():
+    # cols seed, ray, biome, dist, radius, level
+    A = np.array([[5, 0, 3, 100, 0, 1], [5, 0, 4, 200, 0, 1], [5, 0, cw.REACH, 900, 0, 1],
+                  [5, 0, 3 + cw.TIE_ANY, 80, 0, 1], [5, 0, 4 + cw.TIE_STRICT, 250, 0, 1],
+                  [5, 0, 3 + cw.TIE_STRICT, -1, 0, 1], [6, 0, 3, 50, 0, 1], [6, 0, 7 + cw.TIE_ANY, 40, 0, 1]])
+    key = lambda X: sorted(map(tuple, X[:, [0, 2, 3]].tolist()))
+    assert key(cw.tview(A, "hf")) == [(5, 3, 100), (5, 4, 200), (5, cw.REACH, 900), (6, 3, 50)]
+    assert key(cw.tview(A, "any")) == [(5, 3, 80), (5, 4, 200), (5, cw.REACH, 900), (6, 3, 50), (6, 7, 40)]
+    assert key(cw.tview(A, "strict")) == [(5, 4, 250), (5, cw.REACH, 900), (6, 3, 50)]
+    assert cw.never_strict(A) == 1
+
+
+def test_seqs_double_with_ties():
+    assert cw.seqs({}) == cw.SEQS and cw.seqs({"ties": True}) == 2 * cw.SEQS
+
+
+@pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
+def test_end_to_end_with_tie_rows_brackets_the_hint_free_estimate(tmp_path):
+    plan = tiny_plan(tmp_path)
+    plan["ties"] = True
+    plan["alpha_each"] = {k: v / 2 for k, v in plan["alpha_each"].items()}
+    cw.check_alpha(plan)
+    cw.run(plan, log=lambda *a: None)
+    V, S, man = cw.load_arm(plan, "spawn")
+    assert set(V) == set(cw.VIEWS)
+    cert = cw.report(plan)
+    for x in cert["results"]:
+        assert x["ED_lo"] <= x["ED_any"] + 1e-9 and x["ED_strict"] <= x["ED_hi"] + 1e-9
+        assert x["A_any"] <= x["A"] + 1e-9 <= x["A_strict"] + 2e-9
+        if x["radius"] == 0:
+            assert x["bias_lo"] <= x["bias_hi"]
+    o = cw.pair_order(plan, 1e-3)
+    for r, v in o["radii"].items():
+        for p in v["pairs"]:
+            assert p["lo"] <= p["diff"] <= p["hi"]
+    for arm in cw.ARMS:
+        assert cw.verify(plan, arm, samples=1, rng=np.random.default_rng(1))["rows_mismatch"] == 0
+
+
+@pytest.mark.skipif(not os.path.exists(EXE), reason="discexact not built")
+def test_fixed_plan_runs_exactly_n_max_even_when_targets_are_met(tmp_path):
+    plan = tiny_plan(tmp_path)
+    plan["target"] = {"0": 1e9, "64": 1e9}            # met at once: an adaptive plan would stop after one chunk
+    cw.fix_n(plan, {0: 6, 64: 4})
+    cw.run(plan, log=lambda *a: None)
+    ms = cr.load_manifest(cw.arm_plan(plan, "spawn"))
+    assert cw.n_of(ms, 0) == 6 and cw.n_of(ms, 64) == 4
