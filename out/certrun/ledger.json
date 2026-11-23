@@ -28,5 +28,25 @@
   "seed0": 13000000000,
   "n": 10170,
   "purpose": "certwalk production 2e048abc0a48 (both arms)"
+ },
+ {
+  "seed0": 12000053666,
+  "n": 161334,
+  "purpose": "certwalk extension c838d3c2e97b (spawn arm)"
+ },
+ {
+  "seed0": 15000000000,
+  "n": 53750,
+  "purpose": "certwalk production 81079ca19987 (both arms)"
+ },
+ {
+  "seed0": 15000053750,
+  "n": 161250,
+  "purpose": "certwalk extension 81079ca19987 (spawn arm)"
+ },
+ {
+  "seed0": 16000000000,
+  "n": 10000,
+  "purpose": "certwalk production 5e61f6a48bc9 (both arms)"
  }
 ]
