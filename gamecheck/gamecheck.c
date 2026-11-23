@@ -17,6 +17,7 @@
 #include "util.h"
 #include "tables/btree263.h"
 #include "../c263climate.h"
+#include "../c263ties.h"
 
 #define MCV MC_26_3
 #define NP (sizeof(btree263_param) / sizeof(btree263_param[0]))
@@ -52,6 +53,31 @@ static uint64_t mindist(const int64_t np[6], int b) {
     }
     return best;
 }
+// brute force: least distance over all leaves and the set of biomes reaching it
+static uint64_t brute_set(const int64_t np[6], BSet *out) {
+    uint64_t best = (uint64_t)-1;
+    for (int i = 0; i < TLEN; i++) {
+        if (!IS_LEAF[i]) continue;
+        uint64_t node = btree263_nodes[i], ds = 0;
+        for (int k = 0; k < 6; k++) {
+            int idx = (node >> 8 * k) & 0xFF;
+            int64_t a = np[k] - btree263_param[idx][1], c = btree263_param[idx][0] - np[k];
+            int64_t d = a > 0 ? a : (c > 0 ? c : 0);
+            ds += (uint64_t)(d * d);
+        }
+        if (ds < best) { best = ds; bset_clear(out); }
+        if (ds == best) bset_add(out, (int)((node >> 48) & 0xFF));
+    }
+    return best;
+}
+static const TTree TT = { btree263_steps, &btree263_param[0][0], btree263_nodes, btree263_order, sizeof(btree263_nodes) / sizeof(uint64_t) };
+static long TS_N, TS_SETDIFF, TS_GAME_OUT, TS_OURS_OUT, TS_MULTI;
+// tie set check on one game row: fast set == brute set; the game's biome and our hint-free biome are in it
+static void tiecheck(const int64_t np[6], int ours, int game) {
+    BSet f, b; int nl; uint64_t df = tt_tieset(&TT, np, &f, &nl), db = brute_set(np, &b);
+    TS_N++; TS_SETDIFF += df != db || memcmp(&f, &b, sizeof f) != 0;
+    TS_GAME_OUT += game < 0 || !bset_has(&f, game); TS_OURS_OUT += !bset_has(&f, ours); TS_MULTI += bset_count(&f) > 1;
+}
 typedef struct { long n, npbad, bbad, ties; } Stat;
 static long pairs[256][256];
 int main(void) {
@@ -71,6 +97,7 @@ int main(void) {
             int bad = 0; for (int i = 0; i < 6; i++) bad |= np[i] != v[i];
             int ours = climateToBiome(MCV, (const uint64_t *)np, NULL), game = name2id(bname);
             st->n++; st->npbad += bad;
+            if (!bad) tiecheck(np, ours, game);
             if (ours != game) {
                 st->bbad++;
                 if (!bad) {
@@ -88,6 +115,7 @@ int main(void) {
                        &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], bname) != 7) { fprintf(stderr, "bad: %s", line); return 2; }
             int ours = climateToBiome(MCV, (const uint64_t *)v, NULL), game = name2id(bname);
             sT.n++;
+            tiecheck(v, ours, game);
             if (ours != game) {
                 sT.bbad++;
                 uint64_t dgame = mindist(v, game), dours = mindist(v, ours);
@@ -109,9 +137,11 @@ int main(void) {
     if (sV.n) printf("V checked %ld np_mismatch %ld biome_mismatch %ld exact_ties %ld tie_rate %.3g\n", sV.n, sV.npbad, sV.bbad, sV.ties, (double)sV.ties / sV.n);
     printf("T checked %ld biome_mismatch %ld exact_ties %ld\n", sT.n, sT.bbad, sT.ties);
     printf("S checked %ld spawn_mismatch %ld\n", nS, sbad);
+    printf("tieset checked %ld set_vs_bruteforce_diff %ld game_biome_not_in_set %ld hintfree_not_in_set %ld sets_with_2plus_biomes %ld\n",
+           TS_N, TS_SETDIFF, TS_GAME_OUT, TS_OURS_OUT, TS_MULTI);
     printf("tie pairs (ours vs game, all kinds):");
     for (int a = 0; a < 256; a++) for (int b = 0; b < 256; b++) if (pairs[a][b]) printf(" %s/%s %ld", biome2str(MCV, a), biome2str(MCV, b), pairs[a][b]);
     printf("\n");
-    int ok = sN.npbad == 0 && sV.npbad == 0 && sN.bbad == sN.ties && sV.bbad == sV.ties && sT.bbad == sT.ties && sbad == 0;
+    int ok = TS_SETDIFF == 0 && TS_GAME_OUT == 0 && TS_OURS_OUT == 0 && sN.npbad == 0 && sV.npbad == 0 && sN.bbad == sN.ties && sV.bbad == sV.ties && sT.bbad == sT.ties && sbad == 0;
     return ok ? 0 : 1;
 }

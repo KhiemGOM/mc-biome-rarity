@@ -136,6 +136,10 @@ def quantity_from(W, K, E, X, plan, b, r, inc=None):
 
 # ------------------------------------------------------------------ plan
 REACH = 256                 # discexact row marker: per (seed, ray, radius) the scan reach rho (THEORY.md 8.7)
+# 26.3 tie sandwich rows (discexact, only where they differ from the hint-free row of the same biome b):
+TIE_ANY = 512               # biome b + 512: D_any, first hit where b is in the argmin set T(p) (D_any <= D_game)
+TIE_STRICT = 1024           # biome b + 1024: D_strict, first hit where T(p) = {b} (D_strict >= D_game); dist -1 = never
+                            # the only member within the scanned reach. Column mode: per layer, united over the layers.
 
 
 def arm_plan(plan, arm):

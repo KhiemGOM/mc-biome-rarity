@@ -15,6 +15,7 @@
 #include "generator.h"
 #include "util.h"
 #include "fastclimate.h"
+#include "c263ties.h"      // exact tie sets of the biome lookup (D_any / D_strict rows)
 // Minecraft version (THEORY.md 0): 263 = Java 26.3 (xpple/cubiomes fork, default), 214 = 1.21.4 (Winter Drop).
 #ifndef DX_VERSION
 #define DX_VERSION 263
@@ -22,6 +23,7 @@
 #if DX_VERSION == 263
 #include "tables/btree263.h"
 #include "c263climate.h"   // 26.3 climate and spawn, bit-exact with the game (gamecheck/)
+#include "c263cache.h"     // the same values through a lattice cache (bit-identical, gamecheck/c263cachecheck.c)
 #define DX_MCV MC_26_3
 #define DX_BT(x) btree263_##x
 #elif DX_VERSION == 214
@@ -62,16 +64,26 @@ static inline const C263 *c263_of(const Generator *g) {
     if (!C263_READY || C263_SEED != g->seed) { c263_init(&C263_TLS, g->seed); C263_SEED = g->seed; C263_READY = 1; }
     return &C263_TLS;
 }
+static __thread C263Cache C263_CACHE;          /* zero initialised; c263c_column binds it to the state and seed */
+static inline float c263_column_fast(const Generator *g, int qx, int qz, int64_t np[6]) {
+#ifdef C263_NOCACHE
+    return c263_column(c263_of(g), qx, qz, np);
+#else
+    return c263c_column(c263_of(g), &C263_CACHE, qx, qz, np);
+#endif
+}
 // surface layer (same rule as before: the layer whose depth is nearest 0, from the depth at QY_REF), with 26.3's
 // exact depth at that layer, then the fork's hint-free btree263 lookup
-static int surface_only(const Generator *g, int qx, int qz) {
-    const C263 *c = c263_of(g); int64_t np[6];
-    float off = c263_column(c, qx, qz, np);
+static void surface_np(const Generator *g, int qx, int qz, int64_t np[6]) {
+    float off = c263_column_fast(g, qx, qz, np);
     double dref = (double)c263_depth_at(off, QY_REF) / 10000.0;
     int qs = (int)floor(QY_REF + 32.0 * dref + 0.5);
     if (qs < QY_MIN) qs = QY_MIN;
     if (qs > QY_MAX) qs = QY_MAX;
     np[4] = c263_depth_at(off, qs);
+}
+static int surface_only(const Generator *g, int qx, int qz) {
+    int64_t np[6]; surface_np(g, qx, qz, np);
     return climateToBiome(g->mc, (const uint64_t *)np, NULL);
 }
 #elif defined(DISCEXACT_REFERENCE)
@@ -216,6 +228,32 @@ static int csearch_tie(const uint64_t np[6], int idx, int best, uint64_t *ds, in
     }
     return best;
 }
+// ---- tie sandwich (26.3) ------------------------------------------------------------------------------------------
+// The game returns some leaf of the argmin set T(p) (its search keeps the per-thread hint only on a tie); hint-free is one
+// fixed member. Per cell we also record which biomes are in T(p) (TIE_ANY) and which are the whole of T(p) (TIE_STRICT);
+// for the column, per layer, united over the 96 layers. Rows: biome + 512 = first hit as any member (D_any <= D_game),
+// biome + 1024 = first hit as the only member (D_strict >= D_game), see the output loop.
+#define TIE_ANY 512
+#define TIE_STRICT 1024
+#define NCODE (256 + 512 + 512)
+static int TIES = 0;                           /* --ties 1 (26.3 only) adds the tie rows; off by default until certwalk reads them */
+static __thread BSet T_ANY, T_STRICT;          /* filled by column_set / column_set_ref / surface_ties for the current cell */
+static const TTree TTF = { DX_BT(steps), &DX_BT(param)[0][0], DX_BT(nodes), DX_BT(order), sizeof(DX_BT(nodes)) / sizeof(uint64_t) };
+// biomes of the class c leaves whose five value distance equals best (<= pruning over the same traversal)
+static void cls_collect(const uint64_t np[6], int idx, int depth, int c, uint64_t best, BSet *out) {
+    if (BT21.steps[depth] == 0) {
+        if (LEAF_CLS[idx] == c && dist5(np, idx) == best) bset_add(out, (int)((BT21.nodes[idx] >> 48) & 0xFF));
+        return;
+    }
+    uint32_t step;
+    do { step = BT21.steps[depth]; depth++; } while (idx + step >= BT21.len);
+    int inner = BT21.nodes[idx] >> 48;
+    for (int i = 0; i < BT21.order; i++) {
+        if (may_hold(inner, c) && dist5(np, inner) <= best) cls_collect(np, inner, depth, c, best, out);
+        inner += step;
+        if (inner >= (int)BT21.len) break;
+    }
+}
 static int column_set_ref(const Generator *g, int qx, int qz, int *out);
 static int column_set(const Generator *g, int qx, int qz, int *out) {
 #ifdef DISCEXACT_REFERENCE
@@ -225,7 +263,7 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
     pthread_once(&CLS_ONCE, cls_init);
     int64_t np[6]; uint8_t seen[256] = {0};
 #if DX_VERSION == 263
-    float off = c263_column(c263_of(g), qx, qz, np);
+    float off = c263_column_fast(g, qx, qz, np);
 #else
     double off = fast_np_column(g, &FC_TLS, np, qx, qz);
 #endif
@@ -238,14 +276,31 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
         win[BIG0] = w; cst[BIG0] = ds;
         if (!tie) { win[BIG1] = PARTNER[w]; cst[BIG1] = ds; paired = 1; }
     }
+    int ctie[NCLS]; for (int c = 0; c < NCLASS; c++) ctie[c] = 1;   /* 1 = a second leaf may reach the class minimum */
     for (int c = 0; c < NCLASS; c++) {
         if (BIG1 >= 0 && (c == BIG0 || (c == BIG1 && paired))) continue;
         win[c] = -1; cst[c] = (uint64_t)-1;
         if (CLS_N[c] <= 4) {
             for (int q = 0; q < CLS_N[c]; q++) { uint64_t d = dist5(u, CLS_LEAF[c][q]); if (d < cst[c]) { cst[c] = d; win[c] = CLS_LEAF[c][q]; } }
+        } else if (TIES) {           /* same winner as csearch (first leaf of least cost in tree order), plus the tie flag */
+            uint64_t ds = (uint64_t)-1; int tie = 0; win[c] = csearch_tie(u, 0, -1, &ds, 0, c, &tie); cst[c] = ds; ctie[c] = tie;
         } else {
             uint64_t ds = (uint64_t)-1; win[c] = csearch(u, 0, -1, &ds, 0, c); cst[c] = ds;
         }
+    }
+    if (BIG1 >= 0 && paired) ctie[BIG0] = 0;         /* paired only when BIG0's minimum was unique */
+    BSet cset[NCLS];
+    if (TIES) {
+        bset_clear(&T_ANY); bset_clear(&T_STRICT);
+        for (int c = 0; c < NCLASS; c++) {
+            bset_clear(&cset[c]);
+            if (win[c] < 0) continue;
+            if (BIG1 >= 0 && c == BIG1 && paired) continue;          /* filled from BIG0 below (same biomes, same distances) */
+            if (CLS_N[c] <= 4) { for (int q = 0; q < CLS_N[c]; q++) if (dist5(u, CLS_LEAF[c][q]) == cst[c]) bset_add(&cset[c], (int)((BT21.nodes[CLS_LEAF[c][q]] >> 48) & 0xFF)); }
+            else if (!ctie[c]) bset_add(&cset[c], (int)((BT21.nodes[win[c]] >> 48) & 0xFF));   /* unique class minimum */
+            else cls_collect(u, 0, 0, c, cst[c], &cset[c]);
+        }
+        if (BIG1 >= 0 && paired) cset[BIG1] = cset[BIG0];
     }
     for (int y = FC_QY_MIN; y <= FC_QY_MAX; y++) {
 #if DX_VERSION == 263
@@ -259,6 +314,12 @@ static int column_set(const Generator *g, int qx, int qz, int *out) {
             if (bw < 0 || t < bc || (t == bc && LEAF_POS[win[c]] < LEAF_POS[bw])) { bw = win[c]; bc = t; }
         }
         seen[(BT21.nodes[bw] >> 48) & 0xFF] = 1;
+        if (TIES) {                                   /* T(layer) = union of the class tie sets reaching the layer's minimum */
+            BSet tl; bset_clear(&tl);
+            for (int c = 0; c < NCLASS; c++) if (win[c] >= 0 && cst[c] + gdepth(x, c) == bc) bset_union(&tl, &cset[c]);
+            bset_union(&T_ANY, &tl);
+            int one = bset_single(&tl); if (one >= 0) bset_add(&T_STRICT, one);
+        }
     }
     int n = 0; for (int b = 0; b < 256; b++) if (seen[b]) out[n++] = b;
     return n;
@@ -273,6 +334,12 @@ static int column_set_ref(const Generator *g, int qx, int qz, int *out) {
         sampleBiomeNoise(&g->bn, np, qx, y, qz, NULL, SAMPLE_NO_BIOME);
 #endif
         seen[climateToBiome(g->mc, (const uint64_t *)np, NULL) & 0xFF] = 1;
+        if (TIES) {
+            if (y == FC_QY_MIN) { bset_clear(&T_ANY); bset_clear(&T_STRICT); }
+            BSet tl; int nl; tt_tieset(&TTF, np, &tl, &nl);
+            bset_union(&T_ANY, &tl);
+            int one = bset_single(&tl); if (one >= 0) bset_add(&T_STRICT, one);
+        }
     }
     int n = 0; for (int b = 0; b < 256; b++) if (seen[b]) out[n++] = b;
     return n;
@@ -333,6 +400,13 @@ static double cell_D(double px, double pz, double ux, double uz, double x0, doub
 // ---- one ray --------------------------------------------------------------------------------------------------
 typedef void (*emit_fn)(void *ctx, int qx, int qz, int biome, const double *D);
 
+static void emit_ties(emit_fn emit, void *ctx, int qx, int qz, const double *D) {
+    for (int b = 0; b < 256; b++) {
+        if (bset_has(&T_ANY, b)) emit(ctx, qx, qz, b + TIE_ANY, D);
+        if (bset_has(&T_STRICT, b)) emit(ctx, qx, qz, b + TIE_STRICT, D);
+    }
+}
+
 // Enumerate the cells within the active radii (+ margin) of the sub-segment [sa, sb] of the ray, keep those whose centre
 // projection t_c = <c - p, u> lies in [tlo, thi), and emit their D (computed from the ray's own origin and the full cap,
 // so values are identical to a single full scan). act[i] = 0 marks a radius that is no longer needed (D[i] = -1).
@@ -368,9 +442,23 @@ static void scan_core(const Generator *g, double px, double pz, double ux, doubl
                 if (D[i] >= 0) any = 1;
             }
             if (!any) continue;
-            if (!LAYERS_ALL) { emit(ctx, qx, qz, surface_only(g, qx, qz), D); continue; }
+            if (!LAYERS_ALL) {
+#if DX_VERSION == 263
+                int64_t np[6]; surface_np(g, qx, qz, np);
+                emit(ctx, qx, qz, climateToBiome(g->mc, (const uint64_t *)np, NULL), D);
+                if (TIES) {
+                    int nl; tt_tieset(&TTF, np, &T_ANY, &nl);
+                    bset_clear(&T_STRICT); int one = bset_single(&T_ANY); if (one >= 0) bset_add(&T_STRICT, one);
+                    emit_ties(emit, ctx, qx, qz, D);
+                }
+#else
+                emit(ctx, qx, qz, surface_only(g, qx, qz), D);
+#endif
+                continue;
+            }
             int bs[256], nb = column_set(g, qx, qz, bs);
             for (int q = 0; q < nb; q++) emit(ctx, qx, qz, bs[q], D);
+            if (TIES) emit_ties(emit, ctx, qx, qz, D);
         }
     }
 }
@@ -380,11 +468,11 @@ static void scan_ray(const Generator *g, double px, double pz, double ang, const
     scan_core(g, px, pz, cos(ang), sin(ang), 0.0, (double)rmax, -1e300, 1e300, radii, act, nr, rmax, emit, ctx);
 }
 
-typedef struct { int nr; int fm[NLEV][MAXR][256]; double dm[MAXR][256]; } Acc;
+typedef struct { int nr; int fm[NLEV][MAXR][NCODE]; double dm[MAXR][256]; } Acc;
 
 static void emit_min(void *ctx, int qx, int qz, int biome, const double *D) {
     Acc *a = (Acc *)ctx;
-    if (biome < 0 || biome >= 256) return;
+    if (biome < 0 || biome >= NCODE) return;
     for (int l = 0; l < NLEV; l++) {
         int k = LEVELS[l];
         if ((((qx % k) + k) % k) || (((qz % k) + k) % k)) continue;
@@ -392,7 +480,7 @@ static void emit_min(void *ctx, int qx, int qz, int biome, const double *D) {
             if (D[i] < 0) continue;
             int di = (int)floor(D[i] + 0.5);
             if (a->fm[l][i][biome] < 0 || di < a->fm[l][i][biome]) a->fm[l][i][biome] = di;
-            if (l == 0 && (a->dm[i][biome] < 0 || D[i] < a->dm[i][biome])) a->dm[i][biome] = D[i];
+            if (l == 0 && biome < 256 && (a->dm[i][biome] < 0 || D[i] < a->dm[i][biome])) a->dm[i][biome] = D[i];
         }
     }
 }
@@ -476,6 +564,23 @@ static void *worker(void *arg) {
                                              a.fm[l][r][b], (int)j->radii[r], LEVELS[l]);
                             append(&buf, &len, &cap, line, (size_t)n);
                         }
+            /* tie rows, only where they differ from the hint-free row: b + 512 = D_any (<= hint-free D),
+               b + 1024 = D_strict (>= hint-free D; -1 = never the only member within the scanned reach) */
+            for (int l = 0; TIES && l < (NSTOP ? 1 : NLEV); l++)
+                for (int r = 0; r < j->nr; r++)
+                    for (int b = 0; b < 256; b++) {
+                        int hf = a.fm[l][r][b], an = a.fm[l][r][b + TIE_ANY], st = a.fm[l][r][b + TIE_STRICT];
+                        if (an >= 0 && an != hf) {
+                            int n = snprintf(line, sizeof line, "%lld,%d,%.17g,%d,%d,%d,%d\n", (long long)(int64_t)seed, k, ang, b + TIE_ANY,
+                                             an, (int)j->radii[r], LEVELS[l]);
+                            append(&buf, &len, &cap, line, (size_t)n);
+                        }
+                        if (st != hf) {
+                            int n = snprintf(line, sizeof line, "%lld,%d,%.17g,%d,%d,%d,%d\n", (long long)(int64_t)seed, k, ang, b + TIE_STRICT,
+                                             st, (int)j->radii[r], LEVELS[l]);
+                            append(&buf, &len, &cap, line, (size_t)n);
+                        }
+                    }
         }
         j->out[i].s = buf; j->out[i].n = len;
     }
@@ -512,6 +617,7 @@ int main(int argc, char **argv) {
             if (!NSTOP) return bad("--stopset empty");
         }
         else if (!strcmp(a, "--origin")) { if (!strcmp(v, "spawn")) ORIGIN_L = 0; else if (sscanf(v, "uniform:%ld", &ORIGIN_L) != 1 || ORIGIN_L < 1 || ORIGIN_L > 20000000) return bad("--origin spawn|uniform:L"); }
+        else if (!strcmp(a, "--ties")) { TIES = atoi(v) != 0; if (TIES && DX_VERSION != 263) return bad("--ties 1 needs DX_VERSION 263"); }
         else if (!strcmp(a, "--layers")) { if (!strcmp(v, "surface")) LAYERS_ALL = 0; else if (!strcmp(v, "all")) LAYERS_ALL = 1; else return bad("--layers surface|all"); }
         else if (!strcmp(a, "--column-check")) {      /* n random cells per seed: fast bisection vs every layer */
             long n = atol(v); Generator g; setupGenerator(&g, DX_MCV, 0); long bad_ = 0, tot = 0;
@@ -520,8 +626,11 @@ int main(int argc, char **argv) {
                 for (long c = 0; c < n; c++) {
                     int qx = (int)(splitmix64(&st) % 2000001) - 1000000, qz = (int)(splitmix64(&st) % 2000001) - 1000000;
                     if (c % 4 == 1) { qx = (int)(splitmix64(&st) % 4001) - 2000; qz = (int)(splitmix64(&st) % 4001) - 2000; }
-                    int A[256], B[256], na = column_set(&g, qx, qz, A), nb = column_set_ref(&g, qx, qz, B);
+                    int A[256], B[256], na = column_set(&g, qx, qz, A);
+                    BSet fa = T_ANY, fs = T_STRICT;                 /* the fast path's tie sets, then the reference's */
+                    int nb = column_set_ref(&g, qx, qz, B);
                     tot++; if (na != nb || memcmp(A, B, sizeof(int) * (size_t)na)) bad_++;
+                    else if (TIES && (memcmp(&fa, &T_ANY, sizeof fa) || memcmp(&fs, &T_STRICT, sizeof fs))) bad_++;
                 }
             }
             printf("%ld %ld\n", tot, bad_); return bad_ != 0;

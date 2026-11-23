@@ -156,3 +156,86 @@ def test_no_x87_and_no_fma_in_the_climate_code(tmp_path):
     import re
     assert not re.search(r"\bf(ld|stp|add|mul|sub|div)[slt]?\b", asm)
     assert "fmadd" not in asm and "fmsub" not in asm
+
+
+# ---------------------------------------------------------------- tie sandwich and lattice cache
+TIE_C = r'''
+#include <stdio.h>
+#include <string.h>
+#include <inttypes.h>
+#include "generator.h"
+#include "tables/btree263.h"
+#include "c263ties.h"
+#include "c263cache.h"
+static const TTree TT = { btree263_steps, &btree263_param[0][0], btree263_nodes, btree263_order, sizeof(btree263_nodes) / sizeof(uint64_t) };
+static uint8_t LEAF[1 << 16];
+static void mark(int idx, int depth) {
+    if (btree263_steps[depth] == 0) { LEAF[idx] = 1; return; }
+    uint32_t step; do { step = btree263_steps[depth]; depth++; } while (idx + step >= (uint32_t)TT.len);
+    int inner = btree263_nodes[idx] >> 48;
+    for (int i = 0; i < btree263_order; i++) { mark(inner, depth); inner += step; if (inner >= TT.len) break; }
+}
+static uint64_t sm(uint64_t *x) { uint64_t z = (*x += 0x9E3779B97F4A7C15ULL); z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL; z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL; return z ^ (z >> 31); }
+int main(void) {
+    mark(0, 0); uint64_t st = 7; long n = 0, bad = 0, hf_out = 0, multi = 0, cn = 0, cbad = 0;
+    C263 c; C263Cache k; memset(&k, 0, sizeof k);
+    for (int s = 0; s < 4; s++) {
+        c263_init(&c, sm(&st));
+        for (int i = 0; i < 20000; i++) {
+            int64_t np[6]; int qx = (int)(sm(&st) % 400001) - 200000, qz = (int)(sm(&st) % 400001) - 200000, qy = (int)(sm(&st) % 96) - 16;
+            if (i & 1) { qx = i / 64; qz = (i & 63) - 32; }
+            c263_sample6(&c, qx, qy, qz, np);
+            int64_t q[6]; c263c_sample6(&c, &k, qx, qy, qz, q); cn++; cbad += memcmp(np, q, sizeof q) != 0;
+            if (i % 4 == 3) for (int d = 0; d < 6; d++) np[d] = (np[d] / 500) * 500;   /* box corners: frequent ties */
+            BSet f, b; int nl; uint64_t df = tt_tieset(&TT, np, &f, &nl), db = (uint64_t)-1;
+            bset_clear(&b);
+            for (int j = 0; j < TT.len; j++) {
+                if (!LEAF[j]) continue;
+                uint64_t ds = tt_dist(&TT, np, j);
+                if (ds < db) { db = ds; bset_clear(&b); }
+                if (ds == db) bset_add(&b, (int)((btree263_nodes[j] >> 48) & 0xFF));
+            }
+            n++; bad += df != db || memcmp(&f, &b, sizeof f) != 0;
+            hf_out += !bset_has(&f, climateToBiome(MC_26_3, (const uint64_t *)np, NULL)); multi += bset_count(&f) > 1;
+        }
+    }
+    printf("%ld %ld %ld %ld %ld %ld\n", n, bad, hf_out, multi, cn, cbad);
+    return 0;
+}
+'''
+
+
+@pytest.mark.skipif(not os.path.exists(LIB), reason="needs a built Cubiomes fork (./build.sh)")
+def test_tie_sets_equal_brute_force_and_cache_is_exact(tmp_path):
+    src = tmp_path / "t.c"; src.write_text(TIE_C)
+    exe = str(tmp_path / "t")
+    subprocess.run(["gcc", *FLAGS, f"-I{ROOT}", f"-I{CUBI}", "-o", exe, str(src), LIB, "-lm", "-pthread"], check=True)
+    n, bad, hf_out, multi, cn, cbad = map(int, subprocess.run([exe], capture_output=True, text=True, check=True).stdout.split())
+    assert n == 80000 and bad == 0 and hf_out == 0 and multi > 100     # the corner points make real ties
+    assert cn == 80000 and cbad == 0
+
+
+def _rows(path):
+    import csv
+    return [(int(r["seed"]), int(r["ray"]), int(r["biome"]), int(r["dist"]), int(r["mode"]), int(r["level"])) for r in csv.DictReader(open(path))]
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "discexact")), reason="needs ./build.sh")
+@pytest.mark.parametrize("extra", [["--layers", "all", "--rays", "1", "--rmax", "60000", "--radii", "0,128", "--stopset", ",".join(map(str, range(0, 54)))],
+                                   ["--rays", "2", "--rmax", "6000", "--radii", "0,64"]])
+def test_discexact_tie_rows_sandwich_the_hint_free_rows(tmp_path, extra):
+    exe = os.path.join(ROOT, "discexact")
+    a, b = str(tmp_path / "a.csv"), str(tmp_path / "b.csv")
+    args = ["--seeds", "12", "--seed0", "777", "--threads", "4", *extra]
+    subprocess.run([exe, *args, "--ties", "1", "--out", a], check=True)
+    subprocess.run([exe, *args, "--ties", "0", "--out", b], check=True)
+    A, B = _rows(a), _rows(b)
+    assert [r for r in A if r[2] < 512] == B                                 # hint-free rows unchanged, same order
+    hf = {(s, k, bio, m, l): d for s, k, bio, d, m, l in A if bio < 256}
+    ties = [r for r in A if r[2] >= 512]
+    if "--layers" in extra: assert ties                                      # the column runs do meet ties on these rays
+    for s, k, bio, d, m, l in ties:
+        base = bio - 1024 if bio >= 1024 else bio - 512
+        h = hf.get((s, k, base, m, l))
+        if bio >= 1024: assert d == -1 or h is None or d > h                  # D_strict >= hint-free (rows only when different)
+        else: assert h is None or d < h                                       # D_any <= hint-free

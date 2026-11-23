@@ -62,3 +62,10 @@ the last bit for 10/3 of the 927 angles but never in the integer offsets, which 
 Most frequent tie pairs (ours/game): point path lush_caves/dripstone_caves 824 (T), lukewarm_ocean/ocean 19,
 deep_frozen_ocean/deep_cold_ocean 18, plains/forest 15, frozen_ocean/cold_ocean 12, deep_frozen_ocean/mushroom_fields 11;
 chunk path beach/bamboo_jungle 166, ocean/cold_ocean 96, plains/savanna 96, warm_ocean/desert 96, plains/forest 93.
+
+==== Tie sets (c263ties.h) ====
+Fast tie set (pruned least-distance search + <= collection over the fork's tree) vs brute force over all btree263 leaves:
+N + T rows: tieset checked 3000000 set_vs_bruteforce_diff 0 game_biome_not_in_set 0 hintfree_not_in_set 0 sets_with_2plus_biomes 22931
+V rows:     tieset checked 1536000 set_vs_bruteforce_diff 0 game_biome_not_in_set 0 hintfree_not_in_set 0 sets_with_2plus_biomes 1479
+(N/V rows counted where climate matched, i.e. all of them; T rows are random climate points.)
+Lattice cache (c263cache.h) vs c263climate.h: random points 10000000 differ 0; ray path cells 70117175 differ 0 (50 seeds).
