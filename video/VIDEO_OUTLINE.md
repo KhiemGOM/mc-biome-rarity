@@ -11,9 +11,9 @@ All numbers are **final**, on **Minecraft Java 26.3 worldgen** (xpple/cubiomes f
 - Numbers are **estimate ± bound, wrong with chance at most 1 in 500,000** (no more "95%"). Where bounds overlap the biomes are called **tied**.
 - Sight radii locked: **0** (headline), **8 chunks** (what a person would spot), **32 chunks** (pro hunter or cheat client).
 - **Spawn bias was measured, and it is tiny** for every rare biome. This changes section 1, see the note there.
-- v3: final r = 0 numbers (53,750 seeds, the #5 tie split), Khiem's reading of the ranking recorded in section 4c.
+- v3: final r = 0 numbers (53,750 seeds, the #5 tie split), the owner's reading of the ranking recorded in section 4c.
 - v4: the 8 and 32 chunk rankings get their own section (4b), and section 1 uses the normalized spawn effect.
-- v5: everything rerun on 26.3 (the old runs were 1.21.4 worldgen, before the pale garden got bigger). New top 7, pale garden falls from #2 to #6. Section 3 now has two mistakes. Guarantee is 1 in 500,000. Khiem 4c reading mapped to 26.3, the old 21 to 46 tie point dropped. Cold open now teases camman for four videos with four different answers.
+- v5: everything rerun on 26.3 (the old runs were 1.21.4 worldgen, before the pale garden got bigger). New top 7, pale garden falls from #2 to #6. Section 3 now has two mistakes. Guarantee is 1 in 500,000. The owner 4c reading mapped to 26.3, the old 21 to 46 tie point dropped. Cold open now teases camman for four videos with four different answers.
 
 ## What the old video got wrong (so we avoid it)
 
@@ -36,16 +36,16 @@ Looked at `scenes.py` / `make_video.py` (16 silent slides).
 | 3 | How do I know it is right? (wrong twice) | 4:00 to 5:15 | Earns the word "mathematically" |
 | 4 | The countdown | 5:15 to 7:15 | Results |
 | 4b | "Now open your eyes": 8 and 32 chunks | 7:15 to 8:40 | How the ranking changes when you can see |
-| 4c | Reading the ranking | 8:40 to 10:30 | Surprising vs expected (Khiem writes) |
+| 4c | Reading the ranking | 8:40 to 10:30 | Surprising vs expected (the owner writes) |
 | 5 | Outro | 10:30 to 11:10 | Takeaway + limits |
 
-Final script note: draft it with the human voice skill so it sounds like Khiem, not like AI.
+Final script note: draft it with the human voice skill so it sounds like the owner, not like AI.
 
 ## 0. Cold open (0:00 to 0:30)
 
 - Beat: open on camman18, the go-to "rarest biome" creator. Short clip or thumbnail wall of his rarest biome videos (keep clips brief for fair use, and credit him on screen). Frame it as building on his work, not dunking on it: "camman18 has ranked the rarest biomes for years. I wanted to put an actual number on it."
   - Checked (shorts 12UgiwOo28k, ZnfLg6UiDYw, HVfXIyuudTY plus the 1.17 one). His #1 is never mushroom fields, which is the tension for the countdown. His distance method is unknown, so do not describe it on camera.
-- Beat: "Ask the rest of the internet and you get five different answers." Then camman four answers in a row: modified jungle edge (1.17, mushroom not top five), pale garden by area, windswept gravelly hills after the pale garden buff, eroded badlands by distance. Sarcastic beat (Khiem request): four videos, four different answers, none agree with each other, said with love. Then "Everyone has a number. Nobody has a proof."
+- Beat: "Ask the rest of the internet and you get five different answers." Then camman four answers in a row: modified jungle edge (1.17, mushroom not top five), pale garden by area, windswept gravelly hills after the pale garden buff, eroded badlands by distance. Sarcastic beat (the owner request): four videos, four different answers, none agree with each other, said with love. Then "Everyone has a number. Nobody has a proof."
 - Beat: "So I generated a huge number of real Minecraft worlds and walked through every one of them." Seed counter spinning up.
 - Beat (hook): "I worked out the rarest biome in Minecraft. Mathematically." Title and thumbnail: "I found the RAREST biome in Minecraft... MATHEMATICALLY". The 43% story stays in section 3, not the headline.
 - Visual: fast cuts, real 26.3 footage of each candidate biome. Title card last, not first.
@@ -55,7 +55,7 @@ Final script note: draft it with the human voice skill so it sounds like Khiem, 
 The argument: rarity should mean **what it costs a player to find it, starting from where they actually start**.
 
 > **How spawn shows up in the data (26.3).** Two different numbers tell two different stories, and the video uses both:
-> - **In the walk length, spawn barely shows.** Mushroom fields from spawn vs from a random point: +786 blocks, range -6,749 to +8,326. The estimate points the way Khiem expects (a tiny bonus, about 0.5% of the walk), but it is not proven. A spawn effect only lasts the first couple of thousand blocks, which is little on a 150,000 block trip.
+> - **In the walk length, spawn barely shows.** Mushroom fields from spawn vs from a random point: +786 blocks, range -6,749 to +8,326. The estimate points the way the owner expects (a tiny bonus, about 0.5% of the walk), but it is not proven. A spawn effect only lasts the first couple of thousand blocks, which is little on a 150,000 block trip.
 > - **In the normalized spawn effect, it is huge.** "How much more likely is spawn to be in this biome than a random spot", area divided out (`mc263_r0_spawnratio.md`). Plains 1.77x, forest 1.72x, desert and other land biomes about 1.7 to 1.9x at the spawn point. Oceans and rivers: never, 0 in 215,000 spawns (river covers 6.1% of the world). Beaches flip: about 0.01x at the exact spawn point, 1.38x within 128 blocks. **Mushroom fields are pushed away**: never at spawn, about 0.14x (range 0.03 to 0.37) within 512 blocks. Every effect is gone by about 2,000 blocks.
 
 - **Candidate A: the wiki / community label.** It is an opinion, often from old versions, and nobody says what "rare" was measured by. 10 seconds, move on.
@@ -139,7 +139,7 @@ A biome counts as found once it is within sight: **8 chunks (128 blocks)**, what
 - **Mushroom fields never move.** #1 alone and proven at every radius: about 7.4 h of sprinting at 0, 3.6 h at 8 chunks, 1.6 h at 32 chunks. "You cannot see something that is not there."
 - **8 chunks: the podium collapses.** Ranks 2 to 7 can't be separated: windswept gravelly hills, eroded badlands, ice spikes, mangrove, wooded badlands, stony peaks. "Once you can actually see, nobody wins second place."
 - **Pale garden keeps falling:** #6, then 8 to 11, then 12 to 16. Tiny patches, easy to spot.
-- **32 chunks: eroded badlands takes a proven #2** (about 1 h 10 min), up from #5. Big but **sparse** patches (Khiem's reading). The badlands family climbs with it: wooded badlands 3 to 6, badlands 4 to 8.
+- **32 chunks: eroded badlands takes a proven #2** (about 1 h 10 min), up from #5. Big but **sparse** patches (the owner's reading). The badlands family climbs with it: wooded badlands 3 to 6, badlands 4 to 8.
 - **camman link:** eroded badlands near the top looks like his distance ranking. The further you see, the closer you get to "how near is the nearest patch". Mushroom still stays ahead, proven.
 - **The common end:** at 8 chunks river is still #56 alone (283 blocks). At 32 chunks the bottom blurs: dripstone, lush caves and plains tie, and forest and river tie (river 164 blocks).
 - **Which one is "the" answer?** It depends on how far you can see. Only #1 survives every version.
@@ -164,9 +164,9 @@ A biome counts as found once it is within sight: **8 chunks (128 blocks)**, what
   - Pale garden is small (about 160 to 240 blocks) with a moderate count, which fits it dropping fast once you can see (section 4b).
 - End card: three bar charts (0, 8, 32 chunks) with lines connecting each biome across them.
 
-## 4c. Reading the ranking (8:40 to 10:30, Khiem's section)
+## 4c. Reading the ranking (8:40 to 10:30, the owner's section)
 
-Khiem's own reading, every point kept, mapped to the 26.3 ranking. Written out in his voice in VIDEO_SCRIPT.md section 4c. Where the data contradicts or adds to a point it is marked **[data]**.
+the owner's own reading, every point kept, mapped to the 26.3 ranking. Written out in his voice in VIDEO_SCRIPT.md section 4c. Where the data contradicts or adds to a point it is marked **[data]**.
 
 **Expected**
 - **#1 mushroom fields:** surprises nobody. Rare by surface area, and also biased by the spawn factor, biased away. **[data]** Never at spawn, about 0.14x within 512 blocks. Walk length effect +786 blocks (about 0.5%): a likely tiny bonus, not proven, and not why it is #1.
@@ -183,7 +183,7 @@ Khiem's own reading, every point kept, mapped to the 26.3 ranking. Written out i
 - **Deep dark this common (#50, 2,981 blocks).** Insane, but it makes sense: it is a cave biome, and maybe rarity needs a definition that accounts for caves. It is under basically every tall mountain. The ancient city is what is rare, not the deep dark, a mental association. "Now that I think more about it, I do see deep dark everywhere." Same for other caves: less variety underground, so caves benefited more from the 3D biome update. **[data]** Under-mountain and 3D update points not checked. Sulfur caves (new) #49, dripstone #52, lush caves #53. Depends on the rule that a cave biome counts anywhere in the column, reachable or not.
 - **River as the most common (#56, 763 blocks).** A bit surprising, since by area it is smaller than plains or forest. **[data]** Backed: 6.1% vs 10.2% and 12.2%. First guess: not affected by spawn bias, so no tails. **[data]** Contradicted: river is 0x at spawn. His second reason fits: the perfect line catcher.
 
-- **Swept versions (Khiem):** pale garden dropping at 32 chunks makes sense, it is the clumpy small patch case, so at 32 chunks it gets close to its area ranking instead of its clumpiness. Eroded badlands is the opposite: huge inside badlands regions but sparse. So the radii give a rough guess at biome density. **[data]** Pale garden at 32 chunks (12 to 16) lands well below its area rank (0.147% of the world), so "gets to its area ranking" does not fit on 26.3. Eroded badlands rising to a proven #2 does fit "big but sparse".
+- **Swept versions (owner):** pale garden dropping at 32 chunks makes sense, it is the clumpy small patch case, so at 32 chunks it gets close to its area ranking instead of its clumpiness. Eroded badlands is the opposite: huge inside badlands regions but sparse. So the radii give a rough guess at biome density. **[data]** Pale garden at 32 chunks (12 to 16) lands well below its area rank (0.147% of the world), so "gets to its area ranking" does not fit on 26.3. Eroded badlands rising to a proven #2 does fit "big but sparse".
 
 **Callbacks to place**
 - camman: by area we agree (windswept gravelly hills smallest, about 0.07%). By distance clumping matters. We differ at the top: mushroom fields #1.
@@ -198,7 +198,7 @@ Khiem's own reading, every point kept, mapped to the 26.3 ranking. Written out i
 
 ## My take on the convergence proof
 
-You are right that the proof itself would kill retention. But cutting the topic entirely is a mistake, because "how do you know your numbers are right" is the first comment on any stats video, and you have an unusually good answer. The 43% bias is the hook: it is a real mistake you made, it has a visual (a patch slipping between grid dots), and it teaches the one idea a general audience can actually take away, that more data does not fix a biased method. So: no proof, no notation, one 60 to 75 second story, and point to THEORY.md for anyone who wants the maths. (Update: Khiem chose "mathematically" as the headline instead, so the 43% now opens section 3 as the reason that word has to be earned.)
+You are right that the proof itself would kill retention. But cutting the topic entirely is a mistake, because "how do you know your numbers are right" is the first comment on any stats video, and you have an unusually good answer. The 43% bias is the hook: it is a real mistake you made, it has a visual (a patch slipping between grid dots), and it teaches the one idea a general audience can actually take away, that more data does not fix a biased method. So: no proof, no notation, one 60 to 75 second story, and point to THEORY.md for anyone who wants the maths. (Update: the owner chose "mathematically" as the headline instead, so the 43% now opens section 3 as the reason that word has to be earned.)
 
 ## Open items before recording
 

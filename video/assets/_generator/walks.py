@@ -1,4 +1,4 @@
-"""Walk shapes for the "why a straight line" comparison (VIDEO_SCRIPT section 1, Khiem's argument). Every walk gets
+"""Walk shapes for the "why a straight line" comparison (VIDEO_SCRIPT section 1, the owner's argument). Every walk gets
 the same budget of blocks and is sampled every `step` blocks along its length, so they are compared fairly."""
 import math, random
 

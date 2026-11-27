@@ -3,7 +3,7 @@
 > **STATUS 2026-11-27: this file is historical.** It describes the 1.21.4 era (window [4000, 20000], 4 rays per seed, radii 0/64/128, surface layer only). All of that is superseded by the 26.3 certwalk work. The current state, decisions and next steps are in [HANDOVER.md](HANDOVER.md). The style rules and layout notes below are still valid.
 
 
-Owner: Khiem (NTU DSAI Y2). Style rules: never use em-dashes (only "-"); maths in LaTeX; code work order is
+Owner: the channel owner. Style rules: never use em-dashes (only "-"); maths in LaTeX; code work order is
 plan -> tests first (plan lists failure modes, tests cover them) -> implementation; code edits need anchor context; be direct.
 
 ## Layout

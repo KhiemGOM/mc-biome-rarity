@@ -40,7 +40,7 @@ CUTS = {
     "V021": [M + "spawn_1080p.mp4@4"],
     "V022": [M + "one_world_one_ray.mp4"],
     "V023": [M + "wander_vs_straight_ray.png"],
-    # 1b. Why this definition (Khiem's part). Generator: assets/_generator/justify.py
+    # 1b. Why this definition (the owner's part). Generator: assets/_generator/justify.py
     "V024": [M + "spawn_1080p.mp4", M + "spawn_heatmap_vs_random.png"],
     "V026": [M + "player_path_anim.mp4"],
     "V027": [M + "grid_vs_ray_anim.mp4"],

@@ -4,9 +4,9 @@ Working title / thumbnail text: "I found the RAREST biome in Minecraft... MATHEM
 
 v4 (2026-11-27): rewritten for fun. Less maths talk, less hedging, more jokes, same facts. Every number is unchanged from v3
 (Minecraft Java 26.3, 215,000 worlds at sight radius 0, 10,000 each at 8 and 32 chunks; sources in `out/certwalk263_r0/` and
-`out/certwalk263_r128_512/`). Khiem's own reactions in 4c are all still there, point by point, just punchier.
+`out/certwalk263_r128_512/`). The owner's own reactions in 4c are all still there, point by point, just punchier.
 Sprint times use 5.612 blocks per second.
-2026-11-28: Khiem's own pass (the "why this definition" part in section 1, punchier lines throughout), grammar tidied,
+2026-11-28: the owner's own pass (the "why this definition" part in section 1, punchier lines throughout), grammar tidied,
 4b intro shortened since section 1 now sets up the 8 and 32 chunk runs.
 
 Voice over is plain text. `[VISUAL: ...]` is what is on screen. `[GAG: ...]` is a quick visual joke, built in Resolve
@@ -276,7 +276,7 @@ So which ranking is "the" answer? Depends how far you can see. But the one thing
 
 ## 4c. Reading the ranking
 
-[NOTE: Khiem's own reactions, every point kept from v3, wording made punchier. [data] lines are facts to say or show alongside his take.]
+[NOTE: the owner's own reactions, every point kept from v3, wording made punchier. [data] lines are facts to say or show alongside his take.]
 
 So, does this ranking actually make sense? Let's go through it.
 

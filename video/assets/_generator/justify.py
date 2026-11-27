@@ -425,7 +425,7 @@ def gags():
     c = canvas(); d = ImageDraw.Draw(c)
     d.rounded_rectangle([160, 380, 1760, 700], radius=30, fill=(18, 18, 18, 235))
     d.text((960, 500), "the REAL, real, real, real rarest biome", font=F(72, "Bold"), fill=FG + (255,), anchor="mm")
-    d.text((960, 610), "Khiem  ·  Minecraft 26.3, proven", font=F(40), fill=MUT + (255,), anchor="mm")
+    d.text((960, 610), "Minecraft 26.3, proven", font=F(40), fill=MUT + (255,), anchor="mm")
     c.save(G("V083_real_real_real_real_title.png"))
     titles_stack()
     print("wrote gags to", GAGS)
