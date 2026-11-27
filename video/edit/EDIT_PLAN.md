@@ -39,7 +39,7 @@ The import places every visual and the VO. The finishing passes are yours, in th
 
 | Line | Gag |
 |---|---|
-| V006 | The four camman titles stack up one by one ("the rarest biome" ... "the REAL, real, real rarest biome"), then an empty fifth slot with "?" |
+| V006 | The five camman titles stack up one by one, each "real" popping in bigger, then a sixth slot types itself out: "the REAL, real, real, real rarest biome...?" |
 | V011 | "SOURCE: trust me bro" stamp slams onto the wiki scroll |
 | V023 | Tiny squiggly path doing loops next to the straight ray |
 | V027 | Corner counter: "worlds walked: 215,000", then "blocks walked: a lot" |

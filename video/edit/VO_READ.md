@@ -4,15 +4,15 @@
 
 **V001**  If you've ever googled "rarest biome in Minecraft", you've watched camman18. And if you've watched camman18, you've watched him change his answer. A lot.
 
-**V002**  In 2021 it was modified jungle edge, and mushroom fields weren't even in his top five.
+**V002**  First, in 2021: "The Rarest Biome in Minecraft." Modified jungle edge. Then, a couple of months later: "the rarest biome in Minecraft 1.17." Still modified jungle edge, and mushroom fields weren't even in his top five. Consistent. Respect.
 
-**V003**  Then it was the pale garden.
+**V003**  Then in 2026: "The REAL Rarest Biome in Minecraft." Oh. So the first two were fake? Now it's the pale garden.
 
-**V004**  Then the pale garden got bigger in an update, so it became windswept gravelly hills.
+**V004**  Then the pale garden got bigger in an update, so: "the REAL, real rarest biome." Windswept gravelly hills.
 
-**V005**  Then he measured it a different way, and it became eroded badlands.
+**V005**  Then he measured it a different way: "the REAL, real, real rarest biome." Eroded badlands.
 
-**V006**  Four videos. Four answers. Camman, I love you, but at some point "the REAL, real, real rarest biome" stops being a title and starts being a cry for help.
+**V006**  Five videos. Four answers. Three reals. Camman, I love you, but the next one is going to be "the REAL, real, real, real rarest biome", and at some point that stops being a title and starts being a cry for help.
 
 **V007**  And the rest of the internet? Worse. Everyone has an answer. Nobody has a proof.
 

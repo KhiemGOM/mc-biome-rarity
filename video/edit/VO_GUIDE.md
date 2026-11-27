@@ -14,9 +14,10 @@ grouped by section. *(pause)* means take a beat before the next line. Don't say 
    or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V024`
 3. In the teleprompter window: **S** starts recording (record about 10 s of silence first, then press **R** to
    mark line 1 again), read the big line, **Space** for the next one. Flubbed it? **R** and read the line again. **Left**
-   goes back a line. **S** again stops and saves `rec/part1.wav` + `rec/part1.labels.json` automatically. Esc quits.
-4. Record in as many parts as you like (one Audacity project per part, close it without saving afterwards, the WAV is
-   already in `rec/`). Then run the parts in script order:
+   goes back a line. **S** again stops and saves `rec/part1.labels.json`. Then export the audio once: in Audacity
+   **Ctrl+Shift+E**, save the whole project (don't trim anything) as `rec\part1.wav`. Audacity 3.7's scripted export
+   fails on this PC, so the teleprompter reminds you. Esc quits.
+4. Record in as many parts as you like (one Audacity project per part, close it without saving after the export). Then run the parts in script order:
    ```
    .venv\Scripts\python -m vo.run all rec\part1.wav rec\part2.wav rec\part3.wav
    ```

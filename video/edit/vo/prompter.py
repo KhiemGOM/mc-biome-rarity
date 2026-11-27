@@ -6,7 +6,8 @@ Keys: S start/stop recording | Space, Right or Enter: next line | R: retake this
 line | Up/Down: text size | Esc: stop and quit.
 
 While recording, every line that comes up drops an Audacity label with its id (V001...). On stop, the project is
-exported to rec/<name>.wav and the labels to rec/<name>.labels.json, which the align step uses instead of guessing.
+exported to rec/<name>.wav (or you export it with Ctrl+Shift+E if Audacity's scripted export fails) and the labels
+to rec/<name>.labels.json, which the align step uses instead of guessing.
 Without Audacity it still works as a plain teleprompter."""
 import json, os, sys, time
 from .labels import parse_getinfo
@@ -42,8 +43,10 @@ class AudacityPipe:
     def labels(self): return parse_getinfo(self.do("GetInfo: Type=Labels Format=JSON"))
     def label_count(self): return len(self.labels())
 
-    def add_label(self, index, text):
+    def mark(self):  # empty label at the record position (SetLabel during recording would stop it)
         self.do("AddLabelPlaying:")
+
+    def set_label(self, index, text):
         self.do(f'SetLabel: Label={index} Text="{text}"')
 
     def export(self, path):
@@ -57,7 +60,7 @@ class Session:
     def __init__(self, ids, client, start=0, out=None):
         self.ids, self.client, self.idx = list(ids), client, start
         self.out = out or os.path.join(REC, time.strftime("part_%H%M%S"))
-        self.recording, self.n = False, 0
+        self.recording, self.n, self.marked, self.saved = False, 0, [], []
         self.status = "Ready. S to record." if client else "No Audacity connection: teleprompter only (enable mod-script-pipe)."
 
     def line(self):
@@ -75,9 +78,9 @@ class Session:
 
     def _label(self):
         if self.recording and self.client:
-            self._call(self.client.add_label, self.n, self.line())
+            self._call(self.client.mark)
             if self.client:  # still connected, so the label went in
-                self.n += 1
+                self.marked.append(self.line())
 
     def toggle_record(self):
         if not self.client:
@@ -87,21 +90,37 @@ class Session:
             n = self._call(self.client.label_count)
             if not self.client:
                 return
-            self.n = n or 0
+            self.n, self.marked = n or 0, []
             self._call(self.client.record)
             if not self.client:
                 return
             self.recording, self.status = True, "Recording"
             self._label()
+            return
+        self._call(self.client.stop)
+        self.recording = False
+        labels = self._call(self.client.labels)
+        if not self.client:
+            return
+        new = (labels or [])[self.n:]  # this recording's labels, in time order
+        pairs = [(t, i) for (t, _), i in zip(new, self.marked)]
+        for k, (_, i) in enumerate(pairs):
+            self._call(self.client.set_label, self.n + k, i)
+        os.makedirs(os.path.dirname(self.out) or ".", exist_ok=True)
+        try:  # Audacity 3.7's scripted export fails on some setups: then the WAV is one manual export
+            self.client.export(self.out + ".wav"); exported = True
+        except OSError:
+            exported = False
+        self.saved += pairs  # the export holds the whole project, so keep earlier recordings' labels too
+        json.dump({"labels": self.saved}, open(self.out + ".labels.json", "w"), indent=1)
+        name = os.path.basename(self.out)
+        if exported:
+            self.status = f"Saved {name}.wav + {len(pairs)} labels. S to record more."
         else:
-            self._call(self.client.stop)
-            self.recording = False
-            labels = self._call(self.client.labels)
-            if self.client:
-                os.makedirs(os.path.dirname(self.out) or ".", exist_ok=True)
-                self._call(self.client.export, self.out + ".wav")
-                json.dump({"labels": labels or []}, open(self.out + ".labels.json", "w"), indent=1)
-                self.status = f"Saved {os.path.basename(self.out)}.wav + labels. S to record more."
+            self.status = (f"Saved {len(pairs)} labels. Now in Audacity: Ctrl+Shift+E, export the whole project as "
+                           f"rec\\{name}.wav (don't trim anything first). S to record more.")
+        if len(new) != len(self.marked):
+            self.status += f" Label mismatch: Audacity has {len(new)}, expected {len(self.marked)}."
 
     def next(self):
         if self.idx < len(self.ids) - 1:

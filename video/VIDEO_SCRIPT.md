@@ -18,25 +18,25 @@ Voice over is plain text. `[VISUAL: ...]` is what is on screen. `[GAG: ...]` is 
 
 If you've ever googled "rarest biome in Minecraft", you've watched camman18. And if you've watched camman18, you've watched him change his answer. A lot.
 
-[VISUAL: 1.17 video clip]
+[VISUAL: the April 2021 short, then the 1.17 video, each with its title big on screen]
 
-In 2021 it was modified jungle edge, and mushroom fields weren't even in his top five.
+First, in 2021: "The Rarest Biome in Minecraft." Modified jungle edge. Then, a couple of months later: "the rarest biome in Minecraft 1.17." Still modified jungle edge, and mushroom fields weren't even in his top five. Consistent. Respect.
 
-[VISUAL: pale garden short]
+[VISUAL: pale garden short, title on screen]
 
-Then it was the pale garden.
+Then in 2026: "The REAL Rarest Biome in Minecraft." Oh. So the first two were fake? Now it's the pale garden.
 
-[VISUAL: windswept gravelly hills short]
+[VISUAL: windswept gravelly hills short, title on screen]
 
-Then the pale garden got bigger in an update, so it became windswept gravelly hills.
+Then the pale garden got bigger in an update, so: "the REAL, real rarest biome." Windswept gravelly hills.
 
-[VISUAL: eroded badlands short]
+[VISUAL: eroded badlands short, title on screen]
 
-Then he measured it a different way, and it became eroded badlands.
+Then he measured it a different way: "the REAL, real, real rarest biome." Eroded badlands.
 
-Four videos. Four answers. Camman, I love you, but at some point "the REAL, real, real rarest biome" stops being a title and starts being a cry for help.
+Five videos. Four answers. Three reals. Camman, I love you, but the next one is going to be "the REAL, real, real, real rarest biome", and at some point that stops being a title and starts being a cry for help.
 
-[GAG: the four titles stack up on screen: "the rarest biome", "the REAL rarest biome", "the REAL, real rarest biome", "the REAL, real, real rarest biome". A fifth slot appears empty with a question mark.]
+[GAG: the five titles stack up one by one, each "real" popping in bigger: "The Rarest Biome", "the rarest biome 1.17", "The REAL Rarest Biome", "the REAL, real rarest biome", "the REAL, real, real rarest biome". A sixth slot types itself out: "the REAL, real, real, real rarest biome...?"]
 
 [VISUAL: quick cuts of forum posts and wiki pages, each naming a different biome]
 

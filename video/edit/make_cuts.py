@@ -16,11 +16,11 @@ MUSH = Q + "SPOILER_mushroom_fields_v4_1080p.mp4"
 CUTS = {
     # 0. Cold open
     "V001": [RT + ".jpg", J17 + ".jpg", PG + ".jpg", GH + ".jpg", EB + ".jpg"],
-    "V002": [J17 + ".mp4@24", J17 + ".mp4@2"],
+    "V002": [RT + ".mp4@2", J17 + ".mp4@24"],
     "V003": [PG + ".mp4@26"],
     "V004": [GH + ".mp4@39"],
     "V005": [EB + ".mp4@34"],
-    "V006": [J17 + ".jpg", PG + ".jpg", GH + ".jpg", EB + ".jpg"],
+    "V006": [RT + ".jpg", J17 + ".jpg", PG + ".jpg", GH + ".jpg", EB + ".jpg"],
     "V007": [W + "pale_garden_scroll.mp4", W + "windswept_gravelly_hills_scroll.mp4", W + "eroded_badlands_scroll.mp4", W + "stony_peaks_scroll.mp4"],
     "V008": [C + "seed_counter_0_to_215000.mp4", C + "peaks_orbit_1080p.mp4@5", C + "windswept_gravelly_hills_1080p.mp4@5",
              C + "ice_spikes_v2_1080p.mp4@5", C + "eroded_badlands_1080p.mp4@5", C + "pale_garden_v2_1080p.mp4@5"],
