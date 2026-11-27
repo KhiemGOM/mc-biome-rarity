@@ -6,7 +6,7 @@ import glob, os, subprocess, wave
 import numpy as np
 
 CR = 100                 # control rate of the gain curve, Hz
-DUCK, OPEN = 0.22, 0.6   # music gain under speech / with nobody talking (tracks are first normalised to -20 LUFS)
+DUCK, OPEN = 0.14, 0.4   # music gain under speech / with nobody talking (tracks are first normalised to -20 LUFS)
 HOLD = 1.5               # gaps between lines shorter than this stay ducked (no pumping)
 ATTACK, RELEASE = 0.15, 0.6
 MUTE_FADE = 0.05

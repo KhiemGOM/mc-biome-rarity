@@ -18,6 +18,7 @@ rec/*.wav --(vo.run all)--> work/vo_edit.wav (tight VO) + work/rough_cut.fcpxml 
 - **Tools installed for this** (all local to `video/edit/`, git-ignored): `.venv` (faster-whisper on the GPU, rapidfuzz,
   num2words, pytest), `.tools/inter` (Inter font, same as the charts). Already on the PC: Resolve 18.6, Audacity 3.7,
   ffmpeg 9.
+- **Watchable rough cut:** `.venvScriptspython make_preview.py` renders `work/rough_cut_preview.mp4` (visuals, overlays, VO, music) from the timeline; `--until 130` for a quick check, `--reuse-base` when only overlays or audio changed.
 - **Tests:** `.venv\Scripts\python -m pytest` in `video/edit` (parser, take picker, cut list, FCPXML).
 
 ## What the rough cut gives you, and what's left to do by hand in Resolve
@@ -54,7 +55,7 @@ The import places every visual and the VO. The finishing passes are yours, in th
 ## Music
 
 Already on the timeline: `vo.run timeline` writes `work/music_bed.wav` (A2), one Kevin MacLeod track per section from
-`video/edit/music/` (git-ignored), ducked about 18 dB under the voice, up between lines, faded at each section change.
+`video/edit/music/` (git-ignored), ducked about 22 dB under the voice, up between lines, faded at each section change.
 Cue points are markers named `MUSIC: ...`. To swap a track, drop `<section>_<title>.mp3` in `music/` (remove the old
 one) and rerun `vo.run timeline`. Cues, duck level and per-section level are at the top of `vo/music.py`. Do not use
 C418 or Lena Raine (Minecraft's own music gets Content ID claimed).
