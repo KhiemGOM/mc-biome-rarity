@@ -13,23 +13,10 @@ The old `make_video.py` / `scenes.py` slides show the outdated pale garden figur
 3. Keep everything named `SPOILER_` in its own red bin, so it never lands before the #1 reveal (L161).
 4. Record the VO first, then cut picture to it. All game footage is 20 s with no audio.
 
-## Length warning
+## Length
 
-The script header says about 1,600 words (10 to 11 minutes). It is actually about **2,450 words of VO**, roughly
-**15 to 16 minutes** at 155 words per minute:
-
-| Section | Outline slot | VO words | VO at 155 wpm |
-|---|---|---|---|
-| 0 Cold open | 0:40 | 182 | 1:10 |
-| 1 What rare means | 2:00 | 516 | 3:20 |
-| 2 Monte Carlo | 1:20 | 147 | 0:57 |
-| 3 How do I know | 1:15 | 281 | 1:49 |
-| 4 Countdown | 2:00 | 314 | 2:02 |
-| 4b Open your eyes | 1:25 | 361 | 2:20 |
-| 4c Reading the ranking | 1:50 | 539 | 3:29 |
-| 5 Outro | 0:40 | 112 | 0:43 |
-
-Sections 1 and 4c are the long ones. Either trim them before recording or accept a 15 minute cut.
+No length target: quality first (Khiem, 2026-11-27). The full script is about 2,450 words of VO, roughly 15 to 16
+minutes at 155 words per minute. Do not trim beats to save time; cut only what is weak.
 
 ## Cut sheet
 
@@ -127,7 +114,7 @@ cutting away to footage at each beat.
 
 ## Gaps before picture lock
 
-- **VO:** not recorded. Settle the length first (see the length warning).
+- **VO:** not recorded.
 - **Script `[CHECK]`s (L81, L245):** camman's distance method is still unknown. Resolve before recording.
 - **C2:** forum and wiki posts for L37-39.
 - **C8:** talking head for the outro.
