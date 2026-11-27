@@ -34,9 +34,9 @@ Then the pale garden got bigger in an update, so it became windswept gravelly hi
 
 Then he measured it a different way, and it became eroded badlands.
 
-[GAG: the four titles stack up on screen: "the rarest biome", "the REAL rarest biome", "the REAL, real rarest biome", "the REAL, real, real rarest biome". A fifth slot appears empty with a question mark.]
-
 Four videos. Four answers. Camman, I love you, but at some point "the REAL, real, real rarest biome" stops being a title and starts being a cry for help.
+
+[GAG: the four titles stack up on screen: "the rarest biome", "the REAL rarest biome", "the REAL, real rarest biome", "the REAL, real, real rarest biome". A fifth slot appears empty with a question mark.]
 
 [VISUAL: quick cuts of forum posts and wiki pages, each naming a different biome]
 
@@ -246,7 +246,7 @@ So, does this ranking actually make sense? Let's go through it.
 
 Mushroom fields at number one doesn't surprise anyone. It's rare by area, sure. But it's also biased by spawn, and it's biased away. You basically never spawn next to one.
 
-[data, say it: never once in 215,000 worlds. The push does make the walk a tiny bit longer, my best guess is about 786 blocks, half a percent. Too small to prove, and it's not why mushroom wins. It wins because it's tiny and lives in the middle of the ocean.]
+Not once in two hundred and fifteen thousand worlds. That push probably makes the walk a tiny bit longer, my best guess is about 786 blocks, so half a percent. Too small to prove, and it's not why mushroom wins anyway. It wins because there's barely any of it, and what there is lives in the middle of the ocean.
 
 Two to five make total sense. Those are all very rare, very niche, very small biomes.
 
@@ -260,9 +260,9 @@ The middle, nothing crazy. What did surprise me is that both old growth taigas a
 
 From about forty-eight onward, it's the common stuff. Ocean being common? Yeah. Correct. Thank you.
 
-Deep dark being this common is insane though. Number fifty. About three thousand blocks. Three thousand! But I guess it makes sense. It's a cave biome, it's under basically every tall mountain. Which honestly means maybe we need a different definition of rare for caves. Because the ancient city is what's rare. Not the deep dark. My brain just glued the two together. And now that I think about it, I do see deep dark everywhere. Same with the other caves. There's way less variety underground, so caves got a massive boost from the 3D biome update.
-
 [VISUAL: on screen note: "cave biomes count once you pass over them at any depth, reachable or not"]
+
+Deep dark being this common is insane though. Number fifty. About three thousand blocks. Three thousand! But I guess it makes sense. It's a cave biome, it's under basically every tall mountain. Which honestly means maybe we need a different definition of rare for caves. Because the ancient city is what's rare. Not the deep dark. My brain just glued the two together. And now that I think about it, I do see deep dark everywhere. Same with the other caves. There's way less variety underground, so caves got a massive boost from the 3D biome update.
 
 [data: sulfur caves, new in 26.3, is number 49, about four thousand blocks. Dripstone 52, lush caves 53.]
 

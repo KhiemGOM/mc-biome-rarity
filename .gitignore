@@ -22,3 +22,5 @@ out/cert/*.time
 out/certrun/pilot/
 video/edit/media/
 video/edit/.tools/
+video/edit/.venv/
+video/edit/work/
