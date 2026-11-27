@@ -11,7 +11,7 @@ $media = Join-Path $PSScriptRoot 'media'
 $bins = [ordered]@{
   '00_cold_open' = @(
     '00_cold_open\seed_counter_0_to_215000.mp4', '00_cold_open\seed_counter_final.png', '00_cold_open\title_card*',
-    '00_cold_open\forum_wiki\*.png', '00_cold_open\camman18\*.mp4', '00_cold_open\camman18\*.jpg',
+    '00_cold_open\forum_wiki\*.png', '00_cold_open\forum_wiki\*_zoom.mp4', '00_cold_open\camman18\*.mp4', '00_cold_open\camman18\*.jpg',
     "$S\peaks_orbit_1080p.mp4", "$S\windswept_gravelly_hills_1080p.mp4", "$S\ice_spikes_v2_1080p.mp4",
     "$S\eroded_badlands_1080p.mp4", "$S\pale_garden_v2_1080p.mp4", "$S\SPOILER_mushroom_fields_v4_1080p.mp4")
   '01_what_is_rare' = @('01_what_is_rare\*.png', '01_what_is_rare\*.mp4', "$S\spawn_1080p.mp4", '02_monte_carlo\one_world_one_ray.mp4')

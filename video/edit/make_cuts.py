@@ -23,7 +23,7 @@ CUTS = {
     "V004": [GH + ".mp4@39"],
     "V005": [EB + ".mp4@34"],
     "V006": [G + "V006_titles_stack.mp4"],
-    "V007": [FW + "wikihow.png", FW + "mcseedmap.png", FW + "rarest_org.png", FW + "oldest_org.png"],
+    "V007": [FW + "wikihow_zoom.mp4", FW + "mcseedmap_zoom.mp4", FW + "rarest_org_zoom.mp4", FW + "oldest_org_zoom.mp4"],
     "V008": [C + "seed_counter_0_to_215000.mp4", C + "peaks_orbit_1080p.mp4@5", C + "windswept_gravelly_hills_1080p.mp4@5",
              C + "ice_spikes_v2_1080p.mp4@5", C + "eroded_badlands_1080p.mp4@5", C + "pale_garden_v2_1080p.mp4@5"],
     "V009": [C + "seed_counter_final.png"],
