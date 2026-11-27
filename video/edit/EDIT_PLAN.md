@@ -18,7 +18,7 @@ rec/*.wav --(vo.run all)--> work/vo_edit.wav (tight VO) + work/rough_cut.fcpxml 
 - **Tools installed for this** (all local to `video/edit/`, git-ignored): `.venv` (faster-whisper on the GPU, rapidfuzz,
   num2words, pytest), `.tools/inter` (Inter font, same as the charts). Already on the PC: Resolve 18.6, Audacity 3.7,
   ffmpeg 9.
-- **Watchable rough cut:** `.venvScriptspython make_preview.py` renders `work/rough_cut_preview.mp4` (visuals, overlays, VO, music) from the timeline; `--until 130` for a quick check, `--reuse-base` when only overlays or audio changed.
+- **Watchable rough cut:** `.venv\Scripts\python make_preview.py` renders `work/rough_cut_preview.mp4` (visuals, overlays, VO, music) from the timeline; `--until 130` for a quick check, `--reuse-base` when only overlays or audio changed.
 - **Tests:** `.venv\Scripts\python -m pytest` in `video/edit` (parser, take picker, cut list, FCPXML).
 
 ## What the rough cut gives you, and what's left to do by hand in Resolve
