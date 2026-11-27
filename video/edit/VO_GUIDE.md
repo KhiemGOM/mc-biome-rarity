@@ -3,7 +3,31 @@
 What to read: [`VO_READ.md`](VO_READ.md). It's the v4 script with only the spoken lines, numbered V001 to V076,
 grouped by section. *(pause)* means take a beat before the next line. Don't say the numbers out loud.
 
-## The short version
+## The short version (with the teleprompter)
+
+1. **One-time setup:** open Audacity, Edit > Preferences > Modules, set **mod-script-pipe** to **Enabled**, restart
+   Audacity. Set the project rate (bottom left) to **48000 Hz**.
+2. Open Audacity (an empty project), then from `video/edit` start the teleprompter:
+   ```
+   .venv\Scripts\python -m vo.prompter part1
+   ```
+   or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V024`
+3. In the teleprompter window: **S** starts recording (record about 10 s of silence first, then press **R** to
+   mark line 1 again), read the big line, **Space** for the next one. Flubbed it? **R** and read the line again. **Left**
+   goes back a line. **S** again stops and saves `rec/part1.wav` + `rec/part1.labels.json` automatically. Esc quits.
+4. Record in as many parts as you like (one Audacity project per part, close it without saving afterwards, the WAV is
+   already in `rec/`). Then run the parts in script order:
+   ```
+   .venv\Scripts\python -m vo.run all rec\part1.wav rec\part2.wav rec\part3.wav
+   ```
+   With labels, every line is found exactly where you pressed the key, the last take wins, and changed wording or
+   ad-libs are fine. Only lines you never reached show up as `MISSING`.
+5. In Resolve: **File > Import > Timeline**, pick `video/edit/work/rough_cut.fcpxml`.
+
+Tip: press Space right before you start the line, not after you finish the previous one mid-breath. The tool trims the
+silence and the key click, so a small pause after the press is fine.
+
+## Without the teleprompter (plain Audacity)
 
 1. Open **Audacity** (already installed). Set the project rate (bottom left) to **48000 Hz** and the track to **mono**.
 2. Record **10 seconds of silence** first (room tone, handy in the edit).

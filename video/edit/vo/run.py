@@ -134,11 +134,21 @@ def cmd_align(*recs):
     # high-pass rumble, gentle denoise, broadcast loudness (-16 LUFS, peaks under -1.5 dBTP)
     ffmpeg("-i", rec, "-ac", "1", "-ar", str(SR), "-af",
            "highpass=f=80,afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11", "-sample_fmt", "s16", clean)
-    words = transcribe(clean)
-    from .align import align
     its = items()
-    res, missing = align([(i.id, i.text) for i in its if i.kind == "vo"], words)
+    ids = [i.id for i in its if i.kind == "vo"]
     src = read_pcm(clean)
+    lab = [os.path.splitext(r)[0] + ".labels.json" for r in recs]
+    if all(os.path.exists(p) for p in lab):  # recorded with the teleprompter: labels say where every line is
+        from .labels import label_takes
+        files = [([tuple(x) for x in json.load(open(p))["labels"]], probe(r)) for p, r in zip(lab, recs)]
+        res, missing = label_takes(files, ids, src, SR)
+        print(f"using teleprompter labels from {len(files)} file(s)")
+    else:
+        if any(os.path.exists(p) for p in lab):
+            print("note: only some recordings have teleprompter labels, so transcribing all of them instead")
+        words = transcribe(clean)
+        from .align import align
+        res, missing = align([(i.id, i.text) for i in its if i.kind == "vo"], words)
     out, edit_map, t = array.array("h"), {}, 0.0
     fade = int(0.01 * SR)
     for it in its:
