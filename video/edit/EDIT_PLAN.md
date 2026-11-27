@@ -55,7 +55,9 @@ The import places every visual and the VO. The finishing passes are yours, in th
 
 Source: **YouTube Audio Library** (YouTube Studio > Audio Library). Free and cleared for monetized videos, so no
 Content ID claims. Filter by mood and download the WAV. Do not use C418 or Lena Raine (Minecraft's own music is
-copyrighted and gets claimed).
+copyrighted and gets claimed). Decided 2026-11-28: Audio Library only. Tick "Attribution not required" so the
+description needs no credits, and save each track as `video/edit/music/<section>_<title>.wav` (for example
+`0_cold_open_<title>.wav`) so it can go on the timeline under the VO.
 
 | Section | Mood | Notes |
 |---|---|---|
