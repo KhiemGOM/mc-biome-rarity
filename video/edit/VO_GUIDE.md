@@ -1,6 +1,6 @@
 # Recording the voice-over
 
-What to read: [`VO_READ.md`](VO_READ.md). It's the v4 script with only the spoken lines, numbered V001 to V076,
+What to read: [`VO_READ.md`](VO_READ.md). It's the v4 script with only the spoken lines, numbered V001 to V087,
 grouped by section. *(pause)* means take a beat before the next line. Don't say the numbers out loud.
 
 ## The short version (with the teleprompter)
@@ -11,7 +11,7 @@ grouped by section. *(pause)* means take a beat before the next line. Don't say 
    ```
    .venv\Scripts\python -m vo.prompter part1
    ```
-   or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V024`
+   or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V034`
 3. In the teleprompter window: **S** starts recording (record about 10 s of silence first, then press **R** to
    mark line 1 again), read the big line, **Space** for the next one. Flubbed it? **R** and read the line again. **Left**
    goes back a line. **S** again stops and saves `rec/part1.labels.json`. Then export the audio once: in Audacity

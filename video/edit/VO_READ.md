@@ -16,7 +16,7 @@
 
 **V007**  And the rest of the internet? Worse. Everyone has an answer. Nobody has a proof.
 
-**V008**  Now, simulating Minecraft worlds isn't new. People do it all the time. What I did first was write down exactly what "rare" means, as actual maths. Then I threw two hundred and fifteen thousand worlds at that definition. And here's the part that matters: the simulation is mathematically guaranteed to close in on that exact number. Not roughly. As close as I want. Want it tighter? Run more worlds. So not "I think". Not "probably". Proven.  *(pause)*
+**V008**  So where do I come in? What do I actually bring to the table? Because simulating Minecraft worlds isn't new. People do it all the time. What I did first was write down exactly what "rare" means, as actual maths. Then I threw two hundred and fifteen thousand worlds at that definition. And here's the part that matters: the simulation is mathematically guaranteed to close in on that exact number. Not roughly. As close as I want. Want it tighter? Run more worlds. So not "I think". Not "probably". Proven, within a margin I get to pick.  *(pause)*
 
 **V009**  And yes, it's going to be a different answer again. Sorry camman.
 
@@ -28,11 +28,11 @@
 
 **V012**  Option two: measure how much of the world each biome covers. That's camman's area video. Sounds objective. Watch this.
 
-**V013**  These two biomes cover exactly the same amount of land. But if you're wandering around, you'll trip over the left one constantly, and you can walk right past the big blob without ever seeing it. Area doesn't care how a biome is spread out, and the spread is most of what decides whether you find it. Camman actually says this himself in his distance video, which is why his answers keep changing.
+**V013**  These two biomes cover exactly the same amount of land. But if you're wandering around, you'll trip over the left one constantly, and you can walk right past the big blob without ever seeing it. Area doesn't care how a biome is spread out, and the spread is most of what decides whether you find it. Camman actually says this himself in his distance from spawn video, which is why his answers keep changing. There's one more thing area misses, but you'll see it better in option three.
 
 **V014**  Option three, and honestly my first idea: drop yourself at a random spot and count how far you walk until you find the biome. That fixes the spread problem.
 
-**V015**  But there's a catch. You never start at a random spot. The game picks where you spawn.
+**V015**  But there's a catch. You never start at a random spot. The game picks where you spawn. And that's a problem.
 
 **V016**  And the game is picky. Like, really picky.
 
@@ -48,122 +48,144 @@
 
 **V022**  The difference: I walk blind, like a real player exploring, with no map telling me where the nearest patch is. And every number comes with a proof, because that's the whole point of this video.
 
-**V023**  And the walk is a straight line. If you wander around in circles, you're measuring how bad you are at walking, not how rare the biome is.
+**V023**  And the walk is a straight line. If you wander around in circles, you're measuring how bad you are at walking, not how rare the biome is. So no Brownian motion, for all you ball knowers out there.
+
+**V024**  But hold on. Who am I to define Minecraft biome rarity? Why this way and not some other way? Why a straight line? Real players don't walk in perfectly straight lines. And what even counts as "finding" a biome? It loaded in your render distance? You saw it with your own eyes? You literally have to touch it?
+
+**V025**  Well, here's my two-part answer.
+
+**V026**  Part one: why a straight line? Think about how a pro player hunts for a biome. They pick roughly one direction and just keep going until something new shows up. Because going straight is one of the best ways to see new ground. Way better than wandering around at random.
+
+**V027**  But what about a grid walk, going back and forth like a lawnmower? Fair. You probably cover new blocks just as fast. But Minecraft biomes aren't random block by block, where every spot could be any of the fifty-six biomes. They come from a few smooth noise maps, so biomes stick together. Any spot is probably the same biome as the spots around it.
+
+**V028**  So a grid walk is actually worse. Every strip runs right next to the last one, through the same biomes you just saw. New blocks, sure, but not really new ground. A straight line never comes back, so almost everything it sees is genuinely new. More actually new ground, more new biomes.
+
+**V029**  It's also the least made-up choice. Sure, I could walk straight and turn at random every so often, which looks more like a real player. But then I have to pick how often you turn, and by how much, and every one of those numbers is me inventing stuff. The straight line has zero settings, just a random direction. And the drifting a real player does? That's human error. I don't want human error baked into a maths definition.
+
+**V030**  Part two: what counts as "found"? Honestly? I don't know. So I did all three.
+
+**V031**  The main one, and the one I think is fairest because it's the least arbitrary: you have to literally be standing in the biome. Is that realistic? Not really. But this is a way to measure rarity, not a player simulator. Whether it's realistic is up for debate... I guess.
+
+**V032**  But I literally just argued "this is what real players do", so, as the very nuanced person I am, I also ran it where a biome counts once it's within 8 chunks of you, and within 32.
+
+**V033**  Are those numbers arbitrary? As heck. Eight I pulled out of my ass. Thirty-two is at least the max render distance in Java, so a bit less made up. But if you're spotting biomes from thirty-two chunks away, you're less a vanilla player and more a 2b2t hack client bot. But I digress.
 
 ## Section 2
 
-**V024**  There's no formula for Minecraft terrain. But there is a seed, and every seed is a whole world.
+**V034**  There's no formula for Minecraft terrain. But there is a seed, and every seed is a whole world.
 
-**V025**  So I used the oldest trick in the book. If you can't calculate something, simulate it a ridiculous number of times and take the average. It's called Monte Carlo, after the casino, which is fitting, because you're basically gambling until the answer stops moving. One dart tells you nothing. Thousands of darts, and suddenly you know pi.
+**V035**  So I used the oldest trick in the book. If you can't calculate something, simulate it a ridiculous number of times and take the average. It's called Monte Carlo, after the casino, which is fitting, because you're basically gambling until the answer stops moving. One dart tells you nothing. Thousands of darts, and suddenly you know pi.
 
-**V026**  Here's one real world. Start at spawn, pick a random direction, walk. Every time I hit a new biome, I write down how far I've gone. So one walk gives me a distance for every biome at once.
+**V036**  Here's one real world. Start at spawn, pick a random direction, walk. Every time I hit a new biome, I write down how far I've gone. So one walk gives me a distance for every biome at once.
 
-**V027**  Then a new world. And another. Two hundred and fifteen thousand times.
+**V037**  Then a new world. And another. Two hundred and fifteen thousand times.
 
-**V028**  The worlds come from Cubiomes, a tool that runs the real Minecraft world generator without the game, here the version for 26.3. So these are real worlds, block for block, the same ones you'd get in game.
+**V038**  The worlds come from Cubiomes, a tool that runs the real Minecraft world generator without the game, here the version for 26.3. So these are real worlds, block for block, the same ones you'd get in game.
 
 ## Section 3
 
-**V029**  Okay. "Mathematically" is a big word in a title. So let me earn it, by telling you about the two times I got it completely wrong.
+**V039**  Okay. "Mathematically" is a big word in a title. So let me earn it, by telling you about the two times I got it completely wrong.
 
-**V030**  Mistake number one. To make the code fast, I only checked the biome every 16 blocks. The results looked amazing. Tiny error bars. More worlds, even tinier error bars. I was very proud of myself.
+**V040**  Mistake number one. To make the code fast, I only checked the biome every 16 blocks. The results looked amazing. Tiny error bars. More worlds, even tinier error bars. I was very proud of myself.
 
-**V031**  Then I checked it against a version that looks at every single block. Turns out small patches fit right between my dots, so I kept stepping over them. Pale garden came out 43 percent further away than it really is.
+**V041**  Then I checked it against a version that looks at every single block. Turns out small patches fit right between my dots, so I kept stepping over them. Pale garden came out 43 percent further away than it really is.
 
-**V032**  And here's the scary part. More worlds would never have fixed it. If your arm is bent, throwing a million more darts just makes you very confidently wrong. Precise is not the same as correct.
+**V042**  And here's the scary part. More worlds would never have fixed it. If your arm is bent, throwing a million more darts just makes you very confidently wrong. Precise is not the same as correct.
 
-**V033**  Mistake number two was even dumber. Halfway through making this video, camman's pale garden short made me check which version of the game my generator was running.  *(pause)*
+**V043**  So now, every time I change the code, the first thing I do is prove it still converges to the value I actually defined.
 
-**V034**  It was 1.21.4. The update right before pale gardens got bigger. So everything I had was for the wrong game. I threw it all away and ran it again on 26.3.
+**V044**  Mistake number two was even dumber. Halfway through making this video, camman's pale garden short made me check which version of the game my generator was running.  *(pause)*
 
-**V035**  Lesson learned: maths can prove your code is right. It can't tell you you're running the wrong version of Minecraft. That one's on you.
+**V045**  It was 1.21.4. The update right before pale gardens got bigger. So everything I had was for the wrong game. I threw it all away and ran it again on 26.3.
 
-**V036**  So now it checks every single block, on the current version, and every number in this video comes with a range that's proven to contain the real answer. The chance that any of them is wrong is one in five hundred thousand. For scale, a naturally pink sheep is about one in six hundred. You are going to see a lot of pink sheep before I'm wrong.
+**V046**  Lesson learned: maths can prove your code is right. It can't tell you you're running the wrong version of Minecraft. That one's on you.
 
-**V037**  The full proof is on GitHub, if you're into that sort of thing. And when two biomes are too close to call, I won't pretend. I'll call it a tie.
+**V047**  So now it checks every single block, on the current version, and every number in this video comes with a range that's proven to contain the real answer. The chance that any of them is wrong is one in five hundred thousand. For scale, a naturally pink sheep is about one in six hundred. You are going to see a lot of pink sheep before I'm wrong.
+
+**V048**  The full proof is on GitHub, if you're into that sort of thing. And when two biomes are too close to call, I won't pretend. I'll call it a tie.
 
 ## Section 4
 
-**V038**  Okay. The rarest biomes in Minecraft 26.3. Measured as how far you walk from spawn until you actually step on the biome.
+**V049**  Okay. The rarest biomes in Minecraft 26.3. Measured as how far you walk from spawn until you actually step on the biome.
 
-**V039**  Number five. Eroded badlands. Seventy thousand blocks. That's three and a half hours of sprinting in a straight line. That's longer than Titanic. This was camman's latest answer, and it's not even top three.
+**V050**  Number five. Eroded badlands. Seventy thousand blocks. That's three and a half hours of sprinting in a straight line. That's longer than Titanic. This was camman's latest answer, and it's not even top three.
 
-**V040**  Number four. Ice spikes. About seventy-five thousand blocks. Three hours forty of holding W.
+**V051**  Number four. Ice spikes. About seventy-five thousand blocks. Three hours forty of holding W.
 
-**V041**  Number three. Stony peaks. Eighty-four thousand blocks, over four hours. It's a grey mountain. That's it. That's the biome. Four hours.
+**V052**  Number three. Stony peaks. Eighty-four thousand blocks, over four hours. It's a grey mountain. That's it. That's the biome. Four hours.
 
-**V042**  Number two. Windswept gravelly hills. Ninety-five thousand blocks, almost five hours. It's the smallest biome in the game by area, and I promise you've never once said its name out loud.
+**V053**  Number two. Windswept gravelly hills. Ninety-five thousand blocks, almost five hours. It's the smallest biome in the game by area, and I promise you've never once said its name out loud.
 
-**V043**  And if you're wondering where pale garden went: on the old version it was number two. Then the update made it bigger, and it fell all the way to six. Fell off, honestly.
+**V054**  And if you're wondering where pale garden went: on the old version it was number two. Then the update made it bigger, and it fell all the way to six. Bro fell off.
 
-**V044**  And number one.  *(pause)*
+**V055**  And number one.  *(pause)*
 
-**V045**  Mushroom fields. A hundred and fifty thousand blocks. That's seven and a half hours of sprinting in a straight line from spawn. That's a full school day of holding W. It's more than one and a half times further than anything else on this list.
+**V056**  Mushroom fields. A hundred and fifty thousand blocks. That's seven and a half hours of sprinting in a straight line from spawn. A full school day of holding W. Even on an elytra spamming rockets, it's still about an hour and a quarter. It's more than one and a half times further than anything else on this list.
 
-**V046**  They're huge once you find one. There are just barely any of them, and they hide way out in the middle of the ocean.
+**V057**  They're huge once you find one. There are just barely any of them, and they hide way out in the middle of the ocean.
 
-**V047**  And remember the biome spawn pushes away? It's this one. You never spawn on mushroom fields. Within 512 blocks of spawn they're about a third as likely as anywhere else, at best. It doesn't change the ranking though, because that push fades after two thousand blocks, and you've still got a hundred and forty-eight thousand to go.
+**V058**  And remember the biome spawn pushes away? It's this one. You almost never spawn on mushroom fields. A seed that does is a legendary seed-hunting find. Within 512 blocks of spawn they're about a third as likely as anywhere else, at best. It doesn't change the ranking though, because that push fades after two thousand blocks, and you've still got a hundred and forty-eight thousand to go.
 
-**V048**  And this order is proven. One through seven, locked in: pale garden sixth, mangrove swamp seventh. The first tie doesn't show up until number eight.
+**V059**  And this order is proven. One through seven, locked in: pale garden sixth, mangrove swamp seventh. The first tie doesn't show up until number eight.
 
-**V049**  But here's the thing. You don't walk around with your eyes closed.
+**V060**  But here's the thing. You don't walk around with your eyes closed.
 
 ## Section 4b
 
-**V050**  In real life you find a biome the moment you see it. So I ran it all again, where a biome counts once it's within 8 chunks of you, which is about what a normal player notices. And then 32 chunks, which is a hardcore biome hunter on max render distance.  *(pause)*
+**V061**  Remember the 8 and 32 chunk versions I promised? Same worlds, same walks, but now a biome counts the moment it's within 8 chunks of you. Then 32.
 
-**V051**  Or a cheat client. No judgement.
+**V062**  Seeing further helps small patches the most. A tiny patch is hard to step on but easy to spot from 500 blocks away. A big blob was never hard to hit in the first place.
 
-**V052**  Seeing further helps small patches the most. A tiny patch is hard to step on but easy to spot from 500 blocks away. A big blob was never hard to hit in the first place.
+**V063**  Mushroom fields does not care. Number one at every distance, alone, proven. Over three and a half hours of sprinting at 8 chunks, an hour and a half at 32. You can't see something that isn't there.
 
-**V053**  Mushroom fields does not care. Number one at every distance, alone, proven. Over three and a half hours of sprinting at 8 chunks, an hour and a half at 32. You can't see something that isn't there.
+**V064**  Everything below it, though, falls apart. At 8 chunks, windswept gravelly hills, eroded badlands, ice spikes, mangrove, wooded badlands and stony peaks all land somewhere between two and seven, and they're too close to call. Six-way tie for second. Everybody gets a participation trophy.
 
-**V054**  Everything below it, though, falls apart. At 8 chunks, windswept gravelly hills, eroded badlands, ice spikes, mangrove, wooded badlands and stony peaks all land somewhere between two and seven, and they're too close to call. Six-way tie for second. Everybody gets a participation trophy.
+**V065**  Pale garden just keeps falling. Sixth if you have to step on it, eight to eleven at 8 chunks, and twelve to sixteen at 32. Its patches are tiny, so they're hard to step on but really easy to spot.
 
-**V055**  Pale garden just keeps falling. Sixth if you have to step on it, eight to eleven at 8 chunks, and twelve to sixteen at 32. Its patches are tiny, so they're hard to step on but really easy to spot.
+**V066**  At 32 chunks, eroded badlands climbs to a proven second. About an hour and ten minutes. It's the reverse of pale garden: big patches, but so few and so far apart that seeing further helps everything else more. And it drags the whole badlands family up with it. Wooded badlands goes to three to six, plain badlands to four to eight.
 
-**V056**  At 32 chunks, eroded badlands climbs to a proven second. About an hour and ten minutes. It's the reverse of pale garden: big patches, but so few and so far apart that seeing further helps everything else more. And it drags the whole badlands family up with it. Wooded badlands goes to three to six, plain badlands to four to eight.
+**V067**  And look at that: eroded badlands near the top. That's starting to look like camman's distance ranking. The further you can see, the closer you get to his answer. But even at 32 chunks, mushroom fields stays ahead, and that gap is proven.
 
-**V057**  And look at that: eroded badlands near the top. That's starting to look like camman's distance ranking. The further you can see, the closer you get to his answer. But even at 32 chunks, mushroom fields stays ahead, and that gap is proven.
-
-**V058**  So which ranking is "the" answer? Depends how far you can see. But the one thing every version agrees on is number one.
+**V068**  So which ranking is "the" answer? Depends how far you can see. But the one thing every version agrees on is number one.
 
 ## Section 4c
 
-**V059**  So, does this ranking actually make sense? Let's go through it.
+**V069**  So, does this ranking actually make sense? Let's go through it.
 
-**V060**  Mushroom fields at number one doesn't surprise anyone. It's rare by area, sure. But it's also biased by spawn, and it's biased away. You basically never spawn next to one.
+**V070**  Mushroom fields at number one doesn't surprise anyone. It's rare by area, sure. But it's also biased by spawn, and it's biased away. You basically never spawn next to one.
 
-**V061**  Not once in two hundred and fifteen thousand worlds. That push probably makes the walk a tiny bit longer, my best guess is about 786 blocks, so half a percent. Too small to prove, and it's not why mushroom wins anyway. It wins because there's barely any of it, and what there is lives in the middle of the ocean.
+**V071**  Not once in two hundred and fifteen thousand worlds. That push probably makes the walk a tiny bit longer, my best guess is about 786 blocks, so half a percent. Too small to prove, and it's not why mushroom wins anyway. It wins because there's barely any of it, and what there is lives in the middle of the ocean.
 
-**V062**  Two to five make total sense. Those are all very rare, very niche, very small biomes.
+**V072**  Two to five make total sense. Those are all very rare, very niche, very small biomes.
 
-**V063**  Seven, though. Mangrove swamp. That one surprised me. I feel like I stumble into mangroves all the time. But maybe that's because they're big and rare, so when you do find one, it's a LOT of mangrove. Or maybe my last SMP just spawned next to one and I'm biased. It's also just a really unique biome. You remember every mangrove you've ever been in. Everything else is just "plains" to me.
+**V073**  Seven, though. Mangrove swamp. That one surprised me. I feel like I stumble into mangroves all the time. But maybe that's because they're big and rare, so when you do find one, it's a LOT of mangrove. Or maybe my last SMP just spawned next to one and I'm biased. It's also just a really unique biome. You remember every mangrove you've ever been in. Unlike half of this list, which is just "plains" to me.
 
-**V064**  Eleven to nineteen, nothing too surprising. Except windswept hills, sixteen to eighteen. That's low. But again, that's a memory thing. Literally nobody remembers what a windswept hills looks like. But everyone notices a cherry grove. So when people vote windswept hills as rarer, they're voting for "niche", not "rare".
+**V074**  Eleven to nineteen, nothing too surprising. Except windswept hills, sixteen to eighteen. That's low. But again, that's a memory thing. Literally nobody remembers what a windswept hills looks like. But everyone notices a cherry grove. So when people vote windswept hills as rarer, they're voting for "niche", not "rare".
 
-**V065**  The middle, nothing crazy. What did surprise me is that both old growth taigas and sparse jungle are way down here. Old growth spruce and pine taiga at around twenty-three to twenty-six, sparse jungle at thirty-six to thirty-seven. Niche, not rare. Same story.
+**V075**  The middle, nothing crazy. What did surprise me is that both old growth taigas and sparse jungle are way down here. Old growth spruce and pine taiga at around twenty-three to twenty-six, sparse jungle at thirty-six to thirty-seven. Niche, not rare. Same story.
 
-**V066**  From about forty-eight onward, it's the common stuff. Ocean being common? Yeah. Correct. Thank you.
+**V076**  From about forty-eight onward, it's the common stuff. Ocean being common? Yeah. Correct. Thank you.
 
-**V067**  Deep dark being this common is insane though. Number fifty. About three thousand blocks. Three thousand! But I guess it makes sense. It's a cave biome, it's under basically every tall mountain. Which honestly means maybe we need a different definition of rare for caves. Because the ancient city is what's rare. Not the deep dark. My brain just glued the two together. And now that I think about it, I do see deep dark everywhere. Same with the other caves. There's way less variety underground, so caves got a massive boost from the 3D biome update.
+**V077**  Deep dark being this common is insane though. Number fifty. About three thousand blocks. Three thousand! But I guess it makes sense. It's a cave biome, it's under basically every tall mountain. Which honestly means maybe caves need their own definition of rare, one that counts whether you can actually get to them.
 
-**V068**  Plains and forest being the most common makes sense.
+**V078**  Or maybe it's that the ancient city is what's rare. Not the deep dark. My brain just glued the two together. And now that I think about it, I do see deep dark everywhere. Same with the other caves. There's way less variety underground, so caves got a massive boost from the 3D biome system.
 
-**V069**  Except. They're not the most common.  *(pause)*
+**V079**  Plains and forest being the most common makes sense.
 
-**V070**  River is. About seven hundred and sixty blocks on average. And that's weird, because by area, river is smaller than plains or forest. My first guess was spawn, that rivers just don't get pushed around by spawn. Nope. You literally never spawn in a river. It's the shape. Rivers are long thin lines cutting through everything, so any straight walk crosses one almost immediately. River is the ultimate line catcher.
+**V080**  Except. They're not the most common.  *(pause)*
 
-**V071**  So, camman. By area, we agree. Windswept gravelly hills covers the least of the world in my numbers too, about 0.07 percent. And on distance, you were right that how a biome is spread out changes everything. Where we split is the top. With a blind walk and a proof, mushroom fields is number one, and it's not close.
+**V081**  River is. About seven hundred and sixty blocks on average. And that's weird, because by area, river is smaller than plains or forest. My first guess was spawn. Maybe the game just loves putting you near rivers? Nope, it's the opposite. You spawn right in plains and forest all the time, and you never spawn in a river. Spawn is literally helping the other two. And river STILL wins, seven sixty against over a thousand. So it's the shape. Rivers are long thin lines cutting through everything, so any straight walk crosses one almost immediately. River is the ultimate line catcher.
 
-**V072**  The REAL, real, real, real rarest biome. You're welcome.
+**V082**  So, camman. By area, we agree. Windswept gravelly hills covers the least of the world in my numbers too, about 0.07 percent. And on distance, you were right that how a biome is spread out changes everything. Where we split is the top. With a blind walk and a proof, mushroom fields is number one, and it's not close.
+
+**V083**  The REAL, real, real, real rarest biome. You're welcome.
 
 ## Section 5
 
-**V073**  So. The rarest biome in Minecraft 26.3 is mushroom fields. Seven and a half hours of sprinting from spawn if you have to step on it, and still number one no matter how far you can see.
+**V084**  So. The rarest biome in Minecraft 26.3 is mushroom fields. Seven and a half hours of sprinting from spawn if you have to step on it, and still number one no matter how far you can see.
 
-**V074**  A few honest limits, quickly. This is Java 26.3. The walk is a straight line from spawn, over land and water, so it's distance, not time. Nobody is actually sprinting across the ocean for seven hours. And "found" means the biome is there, not that you actually looked at it.
+**V085**  A few honest limits, quickly. This is Java 26.3. The walk is a straight line from spawn, over land and water, so it's distance, not time. Nobody is actually sprinting across the ocean for seven hours. And "found" means the biome is there, not that you actually looked at it.
 
-**V075**  All the code is open source, and so is the maths. If you think I got something wrong, go check. I've already found two of my own mistakes, so honestly, it's a fair request.  *(pause)*
+**V086**  All the code is open source, and so is the maths. If you think I got something wrong, go check. I've already found two of my own mistakes, so honestly, it's a fair request.  *(pause)*
 
-**V076**  See you in the next one. Hopefully closer to spawn.
+**V087**  See you in the next one. Hopefully closer to spawn.
