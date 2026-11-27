@@ -12,6 +12,7 @@ EB = C + "20261118_HVfXIyuudTY_the REAL, real, real rarest biome in Minecraft...
 RT = C + "20210427_RTu-RkcdXpE_The Rarest Biome in Minecraft #Shorts"
 W, M, H, N, Q, R, O = "_wiki_scrolls/", "01_what_is_rare/", "02_monte_carlo/", "03_how_do_i_know/", "04_countdown/", "04b_open_your_eyes/", "04c_reading_the_ranking/"
 MUSH = Q + "SPOILER_mushroom_fields_v4_1080p.mp4"
+G = "gags/"
 
 CUTS = {
     # 0. Cold open
@@ -20,7 +21,7 @@ CUTS = {
     "V003": [PG + ".mp4@26"],
     "V004": [GH + ".mp4@39"],
     "V005": [EB + ".mp4@34"],
-    "V006": [RT + ".jpg", J17 + ".jpg", PG + ".jpg", GH + ".jpg", EB + ".jpg"],
+    "V006": [G + "V006_titles_stack.mp4"],
     "V007": [W + "pale_garden_scroll.mp4", W + "windswept_gravelly_hills_scroll.mp4", W + "eroded_badlands_scroll.mp4", W + "stony_peaks_scroll.mp4"],
     "V008": [C + "seed_counter_0_to_215000.mp4", C + "peaks_orbit_1080p.mp4@5", C + "windswept_gravelly_hills_1080p.mp4@5",
              C + "ice_spikes_v2_1080p.mp4@5", C + "eroded_badlands_1080p.mp4@5", C + "pale_garden_v2_1080p.mp4@5"],
@@ -39,13 +40,13 @@ CUTS = {
     "V021": [M + "spawn_1080p.mp4@4"],
     "V022": [M + "one_world_one_ray.mp4"],
     "V023": [M + "wander_vs_straight_ray.png"],
-    # 1b. Why this definition (Khiem's part). Stopgaps from existing assets until the [VISUAL]s in the script are made
+    # 1b. Why this definition (Khiem's part). Generator: assets/_generator/justify.py
     "V024": [M + "spawn_1080p.mp4", M + "spawn_heatmap_vs_random.png"],
-    "V026": [M + "one_world_one_ray.mp4"],
-    "V027": [M + "clumping_same_area_two_panels.png"],
-    "V028": [M + "wander_vs_straight_ray.png"],
-    "V029": [M + "one_world_one_ray.mp4", M + "wander_vs_straight_ray.png"],
-    "V030": [R + "sight_band_8_chunks.png"],
+    "V026": [M + "player_path_anim.mp4"],
+    "V027": [M + "grid_vs_ray_anim.mp4"],
+    "V028": [M + "noise_vs_static.png", M + "grid_vs_ray_curves.png"],
+    "V029": [M + "turn_settings.png"],
+    "V030": [M + "three_ways_found.png"],
     "V031": [M + "spawn_1080p.mp4"],
     "V032": [R + "sight_band_32_chunks.png"],
     "V033": [R + "render_distance_32_1080p.mp4"],
@@ -54,7 +55,7 @@ CUTS = {
     "V035": [H + "darts_estimate_pi.mp4", H + "darts_estimate_pi_final.png"],
     "V036": [H + "one_world_one_ray.mp4", H + "one_world_one_ray_final.png"],
     "V037": [H + "many_worlds_grid.png", H + "running_average_settles_DEMO.png"],
-    "V038": [H + "xpple_cubiomes.png"],
+    "V038": [H + "xpple_cubiomes.png", H + "cubiomes_vs_game.mp4"],
     # 3. How do I know
     "V039": [C + "title_card.png"],
     "V040": [N + "dot_grid_pale_garden_grid.png"],
@@ -110,11 +111,17 @@ CUTS = {
 }
 
 OVERLAY = {
+    "V011": [G + "V011_trust_me_bro_stamp.png"],
+    "V032": [G + "V032_nuanced.png"],
+    "V033": [G + "V033_no_judgement.png"],
+    "V037": [G + "V037_counter_1.png", G + "V037_counter_2.png"],
+    "V041": [G + "V041_43_percent_oops.png"],
+    "V083": [G + "V083_real_real_real_real_title.png"],
     "V050": [Q + "lowerthird_rank5_eroded_badlands.png"],
     "V051": [Q + "lowerthird_rank4_ice_spikes.png"],
-    "V052": [Q + "lowerthird_rank3_stony_peaks.png"],
+    "V052": [Q + "lowerthird_rank3_stony_peaks.png", G + "V052_four_hours_for_this.png"],
     "V053": [Q + "lowerthird_rank2_windswept_gravelly_hills.png"],
-    "V056": [Q + "SPOILER_lowerthird_rank1_mushroom_fields.png"],
+    "V056": [G + "SPOILER_V056_crown.png", Q + "SPOILER_lowerthird_rank1_mushroom_fields.png"],
     "V077": [O + "note_caves_count_any_depth_overlay.png"],
 }
 

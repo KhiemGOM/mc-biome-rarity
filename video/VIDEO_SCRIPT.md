@@ -154,9 +154,9 @@ Then a new world. And another. Two hundred and fifteen thousand times.
 
 [GAG: counter in the corner "worlds walked: 215,000", "blocks walked: a lot"]
 
-The worlds come from Cubiomes, a tool that runs the real Minecraft world generator without the game, here the version for 26.3. So these are real worlds, block for block, the same ones you'd get in game.
-
 [VISUAL: a side by side Cubiomes viz and real mc world, both have the "same coordinate" MC footage flying around got a corresponding Cubiomes dot that follow]
+
+The worlds come from Cubiomes, a tool that runs the real Minecraft world generator without the game, here the version for 26.3. So these are real worlds, block for block, the same ones you'd get in game.
 
 ---
 

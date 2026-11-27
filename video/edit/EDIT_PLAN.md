@@ -35,7 +35,7 @@ The import places every visual and the VO. The finishing passes are yours, in th
 6. **Credits in the description:** "Images: Minecraft Wiki", camman18 video links
    (`assets/00_cold_open/camman18/SOURCES.md`), xpple/cubiomes.
 
-## Gags to build (Text+ / freeze frame)
+## Gags (ready-made in `media/gags/`, already on the overlay track; restyle in Resolve if you like)
 
 | Line | Gag |
 |---|---|
@@ -76,10 +76,9 @@ The Audio Library has a sound effects tab.
 - **VO:** not recorded yet. See `VO_GUIDE.md`.
 - **C2:** forum and wiki posts for V007. Stopgap in the cut: four wiki scroll clips.
 - **C8:** talking head for the outro (optional, the cut works without it).
-- **Section 1 "why this definition" (V024 to V033, added 2026-11-28):** needs a player path heading one way across a
-  biome map, a lawnmower grid path vs one straight ray, and smooth noise vs random static with the grid re-hitting the
-  same biomes. Stopgaps from existing section 1 and 4b assets are in the cut.
-- **V038:** side by side Cubiomes map and real game footage at the same coordinates, a dot following the camera.
-- **Mushroom crown (V056):** a crown graphic over the reveal clip.
+- **Filled 2026-11-28:** section 1 "why this definition" visuals (player path, grid walk vs straight line on a real
+  world plus the 400-world comparison chart, noise vs static, made-up turn settings, three ways to count "found"), V038
+  Cubiomes vs the real game (seed 279 river orbit, dot synced to the clip), and the gag overlays. Generator:
+  `assets/_generator/justify.py`, numbers in `assets/_generator/out/walk_compare.json`.
 - **Filled 2026-11-27:** old growth spruce and pine taiga and sparse jungle (V075), sulfur, dripstone and lush caves
   (V078). See `assets/footage/SHOTS.md`.

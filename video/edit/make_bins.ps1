@@ -14,7 +14,8 @@ $bins = [ordered]@{
     '00_cold_open\camman18\*.mp4', '00_cold_open\camman18\*.jpg',
     "$S\peaks_orbit_1080p.mp4", "$S\windswept_gravelly_hills_1080p.mp4", "$S\ice_spikes_v2_1080p.mp4",
     "$S\eroded_badlands_1080p.mp4", "$S\pale_garden_v2_1080p.mp4", "$S\SPOILER_mushroom_fields_v4_1080p.mp4")
-  '01_what_is_rare' = @('01_what_is_rare\*.png', "$S\spawn_1080p.mp4", '02_monte_carlo\one_world_one_ray.mp4')
+  '01_what_is_rare' = @('01_what_is_rare\*.png', '01_what_is_rare\*.mp4', "$S\spawn_1080p.mp4", '02_monte_carlo\one_world_one_ray.mp4')
+  'gags' = @('gags\*.png', 'gags\*.mp4')
   '02_monte_carlo'  = @('02_monte_carlo\*.mp4', '02_monte_carlo\*.png', 'github_screens\xpple_cubiomes.png')
   '03_how_do_i_know' = @('03_how_do_i_know\*.png', 'github_screens\theory_md.png')
   '04_countdown' = @(

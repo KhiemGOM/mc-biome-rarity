@@ -42,10 +42,15 @@ def load_overlays(path):
 
 
 def overlay_segments(order, times, overlays):
-    """Overlays (lower thirds, notes) show for their own line only, not held."""
+    """Overlays (lower thirds, notes, gags) show for their own line only, not held. Several on one line take turns,
+    splitting the line evenly in the order given, so they never sit on top of each other on the overlay track."""
     segs = []
     for i in order:
         if i in times:
-            for path, src_in in parse_files(overlays.get(i, "")):
-                segs.append((path, src_in, times[i][0], times[i][1]))
+            files = parse_files(overlays.get(i, ""))
+            s, e = times[i]
+            for k, (path, src_in) in enumerate(files):
+                a = s + (e - s) * k / len(files)
+                b = e if k == len(files) - 1 else s + (e - s) * (k + 1) / len(files)
+                segs.append((path, src_in, a, b))
     return segs

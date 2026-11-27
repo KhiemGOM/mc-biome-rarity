@@ -40,3 +40,17 @@ def test_overlays_cover_only_their_own_line():
     times = {"V001": (0, 4), "V002": (4.3, 9), "V003": (9.2, 12)}
     segs = overlay_segments(["V001", "V002", "V003"], times, {"V002": "lt.png"})
     assert segs == [("lt.png", 0.0, 4.3, 9)]
+
+
+def test_several_overlays_on_one_line_take_turns_not_overlap():
+    # a lower third and a gag on the same line used to sit on top of each other on the overlay track
+    from vo.cuts import overlay_segments
+    times = {"V001": (0.0, 2.0), "V002": (2.0, 8.0)}
+    segs = overlay_segments(["V001", "V002"], times, {"V002": "lt.png; gag.png"})
+    assert segs == [("lt.png", 0.0, 2.0, 5.0), ("gag.png", 0.0, 5.0, 8.0)]
+
+
+def test_single_overlay_still_covers_its_whole_line():
+    from vo.cuts import overlay_segments
+    segs = overlay_segments(["V001"], {"V001": (1.0, 4.0)}, {"V001": "lt.png"})
+    assert segs == [("lt.png", 0.0, 1.0, 4.0)]
