@@ -1,4 +1,7 @@
-# Handoff to Claude Code
+# Handoff to Claude Code (historical, see HANDOVER.md)
+
+> **STATUS 2026-11-27: this file is historical.** It describes the 1.21.4 era (window [4000, 20000], 4 rays per seed, radii 0/64/128, surface layer only). All of that is superseded by the 26.3 certwalk work. The current state, decisions and next steps are in [HANDOVER.md](HANDOVER.md). The style rules and layout notes below are still valid.
+
 
 Owner: Khiem (NTU DSAI Y2). Style rules: never use em-dashes (only "-"); maths in LaTeX; code work order is
 plan -> tests first (plan lists failure modes, tests cover them) -> implementation; code edits need anchor context; be direct.
@@ -22,7 +25,7 @@ plan -> tests first (plan lists failure modes, tests cover them) -> implementati
   D_c = dist(spawn, cell) if that is <= r else (first path length s with dist(path(s), cell) <= r) + r. D_b = min over cells.
   Equals the pure block-level model because the 16 blocks of a cell share a biome (tested).
 
-## Results so far (all 1.21, surface layer)
+## Results so far (all 1.21.4, surface layer, SUPERSEDED by 26.3 results, kept for history)
 Centerline, CERTIFIED (out/cert/cert.json is committed; to regenerate it run cert_pipeline.py, ~40 min on 2 cores):
 mean walk +- 95%: mushroom_fields 144,479 (1.85%), pale_garden 113,877 (1.93%), windswept_gravelly_hills 94,501 (1.84%),
 stony_peaks 83,795 (1.70%), ice_spikes 75,689 (1.56%), eroded_badlands 70,390 (1.44%). 38,100 seeds x 4 rays at step 8,
@@ -45,7 +48,7 @@ T1 monotone nested subsets; T2 any fixed sparse scheme converges to ITS OWN targ
 T4 two-phase M_k(all) + [M_1(cal) - M_k(cal)] IS consistent for the exact value with variance (Var(u)+2Cov(u,v))/N + Var(v)/n_c;
 T5 constants are measured not assumed. certify.build_terms_stride implements T4 (tested on synthetic worlds).
 
-## Next steps
+## Next steps (OLD, done or replaced, see HANDOVER.md for the current list)
 0. CERTIFIED WALK FROM SPAWN (supersedes the certrun window run below): `python3 certwalk.py plan|run|report|verify`. Headline E[D] from spawn, no window, plus spawn bias vs a uniform random start on the same seeds. THEORY.md sections 0 (constants and assumption audit) and 8. Report as estimate +- epsilon with ties where ranges overlap.
 0b. (OLD) CERTIFIED EXACT RUN (supersedes 1-2 below): THEORY.md section 6, certrun.py. The plan is already fixed and committed
    (out/certrun/plan.json: betting confidence sequences, alpha split toward 6 rare biomes x 3 radii, per radius seed counts

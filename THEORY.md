@@ -17,6 +17,8 @@ Every claim carries one tag.
 | **[E]** | an estimate from data, with the uncertainty it carries |
 | **[C]** | a fact about the code, checked by reading it and by the named test |
 
+**Status (2026-11-27).** The headline estimand is the full walk from spawn, $\mathbb E[D]$ (section 8, `certwalk.py`), on Minecraft Java 26.3 with all 96 layers of the column and the tie sandwich (Lemma 30, section 0.1). Final radii are 0, 128 and 512 blocks with one ray per seed, not the 0, 64, 128 and 4 rays of the section 0.2 table below (the plan values there are historical: $r$ "placeholders", $J = 4$, target $\pm 5\%$, $\alpha = 0.05$). Production uses $\alpha = 10^{-6}$ per sequence, so every statement of a report holds at once except with chance at most $10^{-6}$ (order statements $2\cdot 10^{-6}$). The windowed estimand $M$ (sections 1.3, 1.4, 6, 7, `certrun.py`) is retired as a headline and kept as the far-field rate. Sections 8.8 to 8.11 and 0.1 (later additions) sit at the end of the file. No proof was changed in this update.
+
 Numerical checks of the theorems on synthetic worlds with known truth are in `tests/test_theory.py` (pure numpy, no Cubiomes, 16 tests), and the reference implementations they use are in `theory.py`.
 
 ## 0. Every constant and every interpretation step (audit, 2026-11-22)

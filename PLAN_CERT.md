@@ -1,3 +1,5 @@
+> Historical (2026-11-22): plan for the windowed centerline run, superseded by certwalk (THEORY.md section 8). See HANDOVER.md.
+
 # Certified run: plan
 
 Goal: report mean walk M_b for the rare biomes with a stated total error epsilon, where
