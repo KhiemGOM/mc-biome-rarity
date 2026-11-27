@@ -4,7 +4,7 @@
   .venv\\Scripts\\python -m vo.run scratch               # robot scratch VO (offline Windows voice), for testing the cut
   .venv\\Scripts\\python -m vo.run align <rec.wav ...>   # clean, transcribe, keep the last good take of each line,
                                                        # write work/vo_edit.wav (tight VO) + work/vo_edit_map.json
-  .venv\\Scripts\\python -m vo.run timeline              # work/rough_cut.fcpxml from cuts.csv (import into Resolve)
+  .venv\\Scripts\\python -m vo.run timeline              # work/rough_cut.fcpxml from cuts.csv + work/music_bed.wav
   .venv\\Scripts\\python -m vo.run all <rec.wav ...>     # align + timeline
 """
 import array, json, os, subprocess, sys, wave
@@ -193,12 +193,16 @@ def cmd_timeline():
             durs[p] = probe(p)
         clips.append(Clip(p, a, b, kind=kind, src_dur=durs.get(p, 0.0), src_in=src_in, lane=lane))
     marks = [(times[i.id][0], f"{i.id} {i.text[:60]}") for i in its if i.id in times and i.kind == "vo"]
+    from .music import render_bed
+    bed = os.path.join(WORK, "music_bed.wav")
+    cues, notes = render_bed(its, times, m["length"], os.path.join(EDIT, "music"), bed)
     xml, warnings = build_fcpxml(clips, vo=(os.path.join(WORK, "vo_edit.wav"), m["length"]),
-                                 name="Rarest biome rough cut", markers=marks)
+                                 name="Rarest biome rough cut", markers=sorted(marks + cues),
+                                 audio=[(bed, m["length"], -2, "music bed")])
     out = os.path.join(WORK, "rough_cut.fcpxml")
     open(out, "w", encoding="utf-8").write(xml)
     print(f"work/rough_cut.fcpxml: {len(clips)} visuals, {len(marks)} line markers, {m['length'] / 60:.1f} min")
-    for w in warnings:
+    for w in notes + warnings:
         print("  note:", w)
 
 

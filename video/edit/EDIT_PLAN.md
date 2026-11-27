@@ -29,10 +29,10 @@ The import places every visual and the VO. The finishing passes are yours, in th
    put them over a blurred copy of themselves.
 2. **Motion on stills:** a slow push-in (zoom 1.00 to 1.06 over the shot) on every chart keeps them alive.
 3. **Gags** (see the list below): Text+ titles and freeze frames.
-4. **Music and SFX** (cue sheet below).
+4. **Music** is already on A2 (see below); add SFX.
 5. **Color:** the game footage is clean, so a light contrast bump is enough. Pick one of the bright or `_dark` cave clips
    and use it for both.
-6. **Credits in the description:** "Images: Minecraft Wiki", camman18 video links
+6. **Credits in the description:** the music block below, "Images: Minecraft Wiki", camman18 video links
    (`assets/00_cold_open/camman18/SOURCES.md`), xpple/cubiomes.
 
 ## Gags (ready-made in `media/gags/`, already on the overlay track; restyle in Resolve if you like)
@@ -51,27 +51,35 @@ The import places every visual and the VO. The finishing passes are yours, in th
 | V056 | Crown drops onto the mushroom island |
 | V083 | "the REAL, real, real, real rarest biome" title, styled like camman's, with your name |
 
-## Music cue sheet
+## Music
 
-Source: **YouTube Audio Library** (YouTube Studio > Audio Library). Free and cleared for monetized videos, so no
-Content ID claims. Filter by mood and download the WAV. Do not use C418 or Lena Raine (Minecraft's own music is
-copyrighted and gets claimed). Decided 2026-11-28: Audio Library only. Tick "Attribution not required" so the
-description needs no credits, and save each track as `video/edit/music/<section>_<title>.wav` (for example
-`0_cold_open_<title>.wav`) so it can go on the timeline under the VO.
+Already on the timeline: `vo.run timeline` writes `work/music_bed.wav` (A2), one Kevin MacLeod track per section from
+`video/edit/music/` (git-ignored), ducked about 18 dB under the voice, up between lines, faded at each section change.
+Cue points are markers named `MUSIC: ...`. To swap a track, drop `<section>_<title>.mp3` in `music/` (remove the old
+one) and rerun `vo.run timeline`. Cues, duck level and per-section level are at the top of `vo/music.py`. Do not use
+C418 or Lena Raine (Minecraft's own music gets Content ID claimed).
 
-| Section | Mood | Notes |
+| Section | Track | Cue |
 |---|---|---|
-| 0 Cold open | Upbeat, quirky, fast | Hard stop on "Proven." then hit the title card |
-| 1 What rare means | Light, curious | Drop the volume under the spawn charts |
-| 2 Monte Carlo | Playful (pizzicato, marimba) | |
-| 3 How do I know | Starts confident, then tense | Record scratch and music cut on "It was 1.21.4." |
-| 4 Countdown | Building, drum-led | Silence for "And number one.", big hit on the mushroom reveal |
-| 4b Open your eyes | Chill, open | |
-| 4c Reading the ranking | Lo-fi, conversational | Keep it low, this is you talking |
-| 5 Outro | Warm, resolved | |
+| 0 Cold open | Fluffing a Duck | Hard stop after "Proven, within a margin I get to pick.", title card in silence |
+| 1 What rare means | Easy Lemon | |
+| 2 Monte Carlo | Investigations | |
+| 3 How do I know | Thinking Music | Cut after "...my generator was running." (add a record scratch SFX there), back on "Lesson learned" |
+| 4 Countdown | Volatile Reaction | Silence from "And number one." to the reveal, comes back on "Mushroom fields." (add a hit SFX) |
+| 4b Open your eyes | Airport Lounge | |
+| 4c Reading the ranking | Local Forecast - Elevator | 30% quieter, this is you talking |
+| 5 Outro | Inspired | |
 
-SFX worth having: whoosh (cuts between biomes), record scratch, soft "ding" for each rank, a low thud for slams.
-The Audio Library has a sound effects tab.
+SFX worth adding by hand: whoosh (cuts between biomes), record scratch, soft "ding" for each rank, a low thud for slams.
+
+**Description credits (required, CC BY 4.0):**
+
+```
+Music by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0
+http://creativecommons.org/licenses/by/4.0/
+"Fluffing a Duck", "Easy Lemon", "Investigations", "Thinking Music", "Volatile Reaction",
+"Airport Lounge", "Local Forecast - Elevator", "Inspired"
+```
 
 ## Gaps
 

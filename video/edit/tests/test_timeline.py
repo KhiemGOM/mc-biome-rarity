@@ -114,3 +114,16 @@ def test_overlay_does_not_push_base_lane(media):
     xml, _ = build_fcpxml(clips, vo=None, name="t")
     base = parse(xml).find(".//asset-clip[@lane='1']")
     assert base.get("offset") == "0s" and base.get("duration") == "300/60s"
+
+
+def test_music_bed_goes_on_its_own_audio_lane(media):
+    xml, _ = build_fcpxml([Clip(media["b.png"], 0, 5, kind="still")], vo=(media["vo.wav"], 5.0), name="t",
+                          audio=[(media["c.mp4"], 6.0, -2, "music")])
+    a = parse(xml).find(".//asset-clip[@lane='-2']")
+    assert a is not None and a.get("name") == "music" and a.get("duration") == "360/60s"
+    assert parse(xml).find(".//sequence").get("duration") == "360/60s"  # timeline grows to hold it
+
+
+def test_missing_music_file_raises(media):
+    with pytest.raises(FileNotFoundError, match="bed.wav"):
+        build_fcpxml([], vo=None, name="t", audio=[(os.path.join(os.path.dirname(media["a.mp4"]), "bed.wav"), 3.0, -2, "m")])

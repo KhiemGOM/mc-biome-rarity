@@ -33,13 +33,15 @@ def url(path):
     return "file:///" + quote(p.lstrip("/"), safe="/:")
 
 
-def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=()):
-    """clips: [Clip]. vo: (wav path, duration seconds) or None. Returns (xml string, [warnings])."""
+def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=(), audio=()):
+    """clips: [Clip]. vo: (wav path, duration seconds) or None. audio: extra [(path, seconds, lane, name)] from 0s,
+    e.g. the music bed on lane -2 (A2). Returns (xml string, [warnings])."""
     for c in clips:
         if not os.path.exists(c.path):
             raise FileNotFoundError(c.path)
-    if vo and not os.path.exists(vo[0]):
-        raise FileNotFoundError(vo[0])
+    for p in ([vo[0]] if vo else []) + [x[0] for x in audio]:
+        if not os.path.exists(p):
+            raise FileNotFoundError(p)
     warnings, assets, res, spans = [], {}, [], []
     res.append(f'<format id="r1" name="FFVideoFormat1080p{fps}" frameDuration="1/{fps}s" width="1920" height="1080"/>')
 
@@ -76,6 +78,11 @@ def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=()):
         aid = asset(vo[0], "audio", vo[1])
         body.append(f'<asset-clip ref="{aid}" lane="-1" offset="0s" start="0s" duration="{t(vd, fps)}" name="voice over"/>')
         total = max(total, vd)
+    for path, dur, lane, nm in audio:
+        d = frames(dur, fps)
+        aid = asset(path, "audio", dur)
+        body.append(f'<asset-clip ref="{aid}" lane="{lane}" offset="0s" start="0s" duration="{t(d, fps)}" name={quoteattr(nm)}/>')
+        total = max(total, d)
     marks = "".join(f'<marker start="{t(frames(sec, fps), fps)}" duration="1/{fps}s" value={quoteattr(txt)}/>'
                     for sec, txt in markers)
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE fcpxml>\n<fcpxml version="1.9"><resources>' + "".join(res) +
