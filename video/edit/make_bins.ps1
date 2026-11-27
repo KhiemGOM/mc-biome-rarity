@@ -30,7 +30,9 @@ $bins = [ordered]@{
     '04c_reading_the_ranking\*.png',
     "$S\mangrove_swamp_v5_1080p.mp4", "$S\windswept_hills_v2_1080p.mp4", "$S\cherry_grove_1080p.mp4",
     "$S\river_v2_1080p.mp4", "$S\plains_v3_1080p.mp4", "$S\forest_v2_1080p.mp4", "$S\dappled_forest_1080p.mp4",
-    "$S\deep_dark_1080p.mp4", "$S\deep_dark_dark_1080p.mp4", "$S\ancient_city_1080p.mp4", "$S\ancient_city_dark_1080p.mp4")
+    "$S\deep_dark_1080p.mp4", "$S\deep_dark_dark_1080p.mp4", "$S\ancient_city_1080p.mp4", "$S\ancient_city_dark_1080p.mp4",
+    "$S\old_growth_spruce_taiga_1080p.mp4", "$S\old_growth_pine_taiga_1080p.mp4", "$S\sparse_jungle_1080p.mp4",
+    "$S\sulfur_caves_1080p.mp4", "$S\dripstone_caves_1080p.mp4", "$S\lush_caves_1080p.mp4")
   '05_outro' = @('github_screens\repo_page.png')
   '_wiki_scrolls' = @('wiki_scrolls\*.mp4', 'wiki_scrolls\*.png')
 }

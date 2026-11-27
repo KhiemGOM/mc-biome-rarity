@@ -73,5 +73,5 @@ The Audio Library has a sound effects tab.
 - **VO:** not recorded yet. See `VO_GUIDE.md`.
 - **C2:** forum and wiki posts for V007. Stopgap in the cut: four wiki scroll clips.
 - **C8:** talking head for the outro (optional, the cut works without it).
-- **No footage for:** old growth taigas, sparse jungle, sulfur, dripstone and lush caves (V065, V067). Stopgap: the full
-  ranking pan. Filming them needs a game launch in `mc-capture`.
+- **Filled 2026-11-27:** old growth spruce and pine taiga and sparse jungle (V065), sulfur, dripstone and lush caves
+  (V067). See `assets/footage/SHOTS.md`.

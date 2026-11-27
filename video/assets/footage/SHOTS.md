@@ -46,6 +46,24 @@ Notes for re-shoots:
 - Scripts in `tools\`: `spawn.mjs`, `join.mjs`, `record.mjs`, `export.mjs` (takes a job file from `tmp\jobs\`), `scout.mjs`, `shots_at.mjs`, `airmap.mjs` and `clear.mjs` (checks that a camera path stays out of blocks).
 - Unused takes you can delete: replays `spawn`, `spawn_b`, `render_distance` and worlds `spawnshot1`, `spawnshot2`.
 
+## 4c biomes (filmed 2026-11-27)
+
+All 1920x1080, 60 fps, 20 s, no audio, HUD hidden, each with a `_sheet.png`. Seed 279, world `capture279`.
+
+| Biome | File | Quality | Notes |
+|---|---|---|---|
+| Old growth spruce taiga | `old_growth_spruce_taiga_1080p.mp4` | Great | Orbit over towering spruce, lakes and podzol, centre (202, 2050). |
+| Old growth pine taiga | `old_growth_pine_taiga_1080p.mp4` | Great | Orbit over tall pines on a river, centre (88, 1963). |
+| Sparse jungle | `sparse_jungle_1080p.mp4` | OK | Patchy jungle trees on grassland with a river, centre (166, -154). Wide orbit, so real jungle shows at the edges. |
+| Sulfur caves (new in 26.3) | `sulfur_caves_1080p.mp4` | Great start | Huge yellow sulfur and red cinnabar cavern with sulfur spikes, glide from (98.5, 24.6, -341.5) west. The last ~8 s drift close to a wall: use the first 12 s. |
+| Dripstone caves | `dripstone_caves_1080p.mp4` | Great | Glide east down a gallery of stalactites, from (6.5, 0.6, 18.5). |
+| Lush caves | `lush_caves_1080p.mp4` | Great | Moss ceiling, glow berries, clay pools, from (174.5, -5.4, -605.5). |
+
+Cave clips use night vision. How they were found: `tools/biome_grid.mjs` (coarse 3D biome scan for the biggest pocket),
+`tools/scout_cave.mjs` (block dump plus straight glides that look at the most signature blocks), `tools/shots_at.mjs`
+previews, `tools/record.mjs` (now closes any open chat before recording), `tools/cave_job.mjs` + `tools/export.mjs`.
+The first lush pocket near (-32, -416) is only a mossy ravine edge with a ruined portal: skip it.
+
 ## Known problems
 - The listed coordinates in `video/assets/CAPTURE_LIST.md` are single points. Several biomes are thin patches there, so each shot was re-centred on the densest nearby patch (`execute if biome` grid, 24 block spacing).
 - Wooded badlands and mushroom fields are tiny in this world. Mushroom fields is at about (1085, -1020), not (888, -1104): the listed point is open ocean with a ruined portal.
