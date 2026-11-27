@@ -44,7 +44,7 @@ And the rest of the internet? Worse. Everyone has an answer. Nobody has a proof.
 
 [VISUAL: seed counter spinning up past 200,000, fast biome cuts]
 
-So I generated two hundred and fifteen thousand Minecraft worlds, walked through every single one of them, and found the rarest biome. Not "I think". Not "probably". Proven.
+Now, simulating Minecraft worlds isn't new. People do it all the time. What I did first was write down exactly what "rare" means, as actual maths. Then I threw two hundred and fifteen thousand worlds at that definition. And here's the part that matters: the simulation is mathematically guaranteed to close in on that exact number. Not roughly. As close as I want. Want it tighter? Run more worlds. So not "I think". Not "probably". Proven.
 
 [beat]
 
