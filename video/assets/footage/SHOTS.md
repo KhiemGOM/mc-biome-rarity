@@ -23,6 +23,29 @@ Frames of every clip were checked before listing. `SPOILER_` files show the mush
 | Dappled forest (new in 26.3) | `dappled_forest_1080p.mp4` | Good | Red, orange and yellow autumn trees on a river island, villages nearby. |
 | Mushroom fields | `SPOILER_mushroom_fields_v4_1080p.mp4` | Great | Real island: mycelium, giant red and brown mushrooms. `_v1` to `_v3` show a ruined portal in open ocean (wrong subject): ignore. |
 
+## Extra shots (filmed 2026-11-26)
+
+All 1920x1080, 60 fps, no audio, HUD hidden. Each has a `_sheet.png` check sheet.
+
+| Shot | Best file | Length | Notes |
+|---|---|---|---|
+| C3 spawn moment | `spawn_1080p.mp4` | 20.0 s | Fresh creative world `spawnshot3`, seed 729643423878493032. First-person look from the spawn point (-628.5, 70, 178.5): savanna hill, turning round to the ocean. |
+| C6 render distance 32 | `render_distance_32_1080p.mp4` | 19.7 s | Seed 279, camera from (624, 125, -1215) to z=-1255 looking north. The eroded badlands mesa is on the horizon. |
+| C6 render distance 8 | `render_distance_8_1080p.mp4` | 19.7 s | Same recording and camera path as the 32 clip, frame for frame. Only ocean and fog. |
+| C6 side by side | `render_distance_side_by_side_1080p.mp4` | 19.7 s | Centre half of each clip, 8 chunks left and 32 right, with labels. |
+| C7 ancient city | `ancient_city_1080p.mp4` | 19.3 s | Fly-in to the centre frame of the city at about (-1104, 176). Night vision, plus a light brightening (gamma 1.2) in the edit. |
+| C7 ancient city, darker | `ancient_city_dark_1080p.mp4` | 19.3 s | Same shot without the brightening. |
+| C7 deep dark cave | `deep_dark_1080p.mp4` | 19.3 s | Natural sculk cave under the stony peaks, from (-896, -42, 68) towards (-915, -43, 45), gliding towards a shrieker. Night vision, gamma 1.25. |
+| C7 deep dark cave, darker | `deep_dark_dark_1080p.mp4` | 19.3 s | Same shot without the brightening. |
+
+Notes for re-shoots:
+- New `capturectl` commands: `rd <chunks>`, `nightvision on|off` (inside a replay), `newworld <folder> <seed>`, `leave`. The old jar and source are kept in `mod\` as `.bak`.
+- Raising the render distance only reaches the game's internal server after leaving and rejoining the world.
+- The recorded player is moved far above the shot before or just after recording starts, or its head shows up in frame.
+- The first frames of an export can show a loading haze (worst underground, up to about 40 frames), so the render distance and cave clips have their starts trimmed. Those trimmed files are re-encoded with libx264, because the system `ffmpeg` cannot use NVENC with this driver.
+- Scripts in `tools\`: `spawn.mjs`, `join.mjs`, `record.mjs`, `export.mjs` (takes a job file from `tmp\jobs\`), `scout.mjs`, `shots_at.mjs`, `airmap.mjs` and `clear.mjs` (checks that a camera path stays out of blocks).
+- Unused takes you can delete: replays `spawn`, `spawn_b`, `render_distance` and worlds `spawnshot1`, `spawnshot2`.
+
 ## Known problems
 - The listed coordinates in `video/assets/CAPTURE_LIST.md` are single points. Several biomes are thin patches there, so each shot was re-centred on the densest nearby patch (`execute if biome` grid, 24 block spacing).
 - Wooded badlands and mushroom fields are tiny in this world. Mushroom fields is at about (1085, -1020), not (888, -1104): the listed point is open ocean with a ruined portal.
