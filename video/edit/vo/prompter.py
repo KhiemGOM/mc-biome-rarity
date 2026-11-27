@@ -122,18 +122,31 @@ class Session:
         if len(new) != len(self.marked):
             self.status += f" Label mismatch: Audacity has {len(new)}, expected {len(self.marked)}."
 
+    def _moved(self):
+        self._label()
+        if self.recording:
+            self.status = "Recording"
+
     def next(self):
         if self.idx < len(self.ids) - 1:
             self.idx += 1
-            self._label()
+            self._moved()
 
     def retake(self):
+        """Keeps recording: the flubbed audio stays in the file and the align step keeps only the last take."""
+        if not self.recording:
+            if self.client:
+                self.status = "Not recording: R only works while recording (press S first)."
+            return
         self._label()
+        if self.client:
+            n = self.marked.count(self.line())
+            self.status = f"Retake {n} of {self.line()}: read it again (the old take gets cut later)"
 
     def back(self):
         if self.idx > 0:
             self.idx -= 1
-            self._label()
+            self._moved()
 
 
 def main():

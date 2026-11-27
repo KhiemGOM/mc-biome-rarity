@@ -65,6 +65,27 @@ def test_retake_marks_same_line_again():
     assert s.marked == ["V001", "V002", "V002"]
 
 
+def test_retake_says_so_on_screen():
+    # R leaves the flubbed audio in the recording (the align step cuts it); the window must show it registered
+    f = Fake(); s = Session(IDS, f)
+    s.toggle_record(); s.retake()
+    assert "retake" in s.status.lower() and "V001" in s.status and "2" in s.status
+    s.retake()
+    assert "3" in s.status
+
+
+def test_retake_when_not_recording_explains():
+    f = Fake(); s = Session(IDS, f)
+    s.retake()
+    assert marks(f) == 0 and "not recording" in s.status.lower()
+
+
+def test_next_line_after_retake_shows_recording_again():
+    f = Fake(); s = Session(IDS, f)
+    s.toggle_record(); s.retake(); s.next()
+    assert s.status == "Recording"
+
+
 def test_back_goes_to_previous_line_and_marks_it():
     f = Fake(); s = Session(IDS, f)
     s.toggle_record(); s.next(); s.back()
