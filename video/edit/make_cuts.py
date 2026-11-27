@@ -13,6 +13,7 @@ RT = C + "20210427_RTu-RkcdXpE_The Rarest Biome in Minecraft #Shorts"
 W, M, H, N, Q, R, O = "_wiki_scrolls/", "01_what_is_rare/", "02_monte_carlo/", "03_how_do_i_know/", "04_countdown/", "04b_open_your_eyes/", "04c_reading_the_ranking/"
 MUSH = Q + "SPOILER_mushroom_fields_v4_1080p.mp4"
 G = "gags/"
+FW = C  # forum_wiki/*.png, linked flat into the bin
 
 CUTS = {
     # 0. Cold open
@@ -22,7 +23,7 @@ CUTS = {
     "V004": [GH + ".mp4@39"],
     "V005": [EB + ".mp4@34"],
     "V006": [G + "V006_titles_stack.mp4"],
-    "V007": [W + "pale_garden_scroll.mp4", W + "windswept_gravelly_hills_scroll.mp4", W + "eroded_badlands_scroll.mp4", W + "stony_peaks_scroll.mp4"],
+    "V007": [FW + "wikihow.png", FW + "mcseedmap.png", FW + "rarest_org.png", FW + "oldest_org.png"],
     "V008": [C + "seed_counter_0_to_215000.mp4", C + "peaks_orbit_1080p.mp4@5", C + "windswept_gravelly_hills_1080p.mp4@5",
              C + "ice_spikes_v2_1080p.mp4@5", C + "eroded_badlands_1080p.mp4@5", C + "pale_garden_v2_1080p.mp4@5"],
     "V009": [C + "seed_counter_final.png"],

@@ -74,8 +74,9 @@ The Audio Library has a sound effects tab.
 ## Gaps
 
 - **VO:** not recorded yet. See `VO_GUIDE.md`.
-- **C2:** forum and wiki posts for V007. Stopgap in the cut: four wiki scroll clips.
 - **C8:** talking head for the outro (optional, the cut works without it).
+- **Filled 2026-11-28:** V007 forum and wiki screenshots (`assets/00_cold_open/forum_wiki/`, sources and credits in its
+  SOURCES.md).
 - **Filled 2026-11-28:** section 1 "why this definition" visuals (player path, grid walk vs straight line on a real
   world plus the 400-world comparison chart, noise vs static, made-up turn settings, three ways to count "found"), V038
   Cubiomes vs the real game (seed 279 river orbit, dot synced to the clip), and the gag overlays. Generator:

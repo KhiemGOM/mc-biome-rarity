@@ -192,7 +192,7 @@ Lesson learned: maths can prove your code is right. It can't tell you you're run
 
 So now it checks every single block, on the current version, and every number in this video comes with a range that's proven to contain the real answer. The chance that any of them is wrong is one in five hundred thousand. For scale, a naturally pink sheep is about one in six hundred. You are going to see a lot of pink sheep before I'm wrong.
 
-[CHECK: pink sheep natural spawn chance is 0.164 percent on the Minecraft Wiki (about 1 in 610). Confirm on the current wiki page before recording.]
+[data: pink sheep spawn as "Very Rare (0.164%)", about 1 in 610 (Minecraft Wiki, Sheep, checked 2026-11-28).]
 
 [VISUAL: GitHub link, THEORY.md]
 
@@ -230,7 +230,7 @@ And number one.
 
 Mushroom fields. A hundred and fifty thousand blocks. That's seven and a half hours of sprinting in a straight line from spawn. A full school day of holding W. Even on an elytra spamming rockets, it's still about an hour and a quarter. It's more than one and a half times further than anything else on this list.
 
-[CHECK: elytra time uses about 33.5 blocks per second for rocket-boosted flight: 149,522 / 33.5 = about 74 minutes. Confirm the speed on the Minecraft Wiki elytra page before recording.]
+[data: elytra time uses 33.5 blocks per second with firework rockets (Minecraft Wiki, Elytra, checked 2026-11-28): 149,522 / 33.5 = about 74 minutes.]
 
 They're huge once you find one. There are just barely any of them, and they hide way out in the middle of the ocean.
 
