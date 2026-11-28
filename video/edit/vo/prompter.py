@@ -2,15 +2,15 @@
 
   .venv\\Scripts\\python -m vo.prompter [name] [--from V030]
 
-Keys: S start/stop recording | Space, Right or Enter: next line | R: retake this line | Left or Backspace: previous
-line | Up/Down: text size | Esc: stop and quit.
+Keys: S start/stop recording | Space, Right or Enter: next line | R: retake this line | P: listen back to your last
+take of this line (stops recording first) | Left or Backspace: previous line | Up/Down: text size | Esc: stop and quit.
 
 While recording, every line that comes up drops an Audacity label with its id (V001...). On stop, the project is
 exported to rec/<name>.wav (or you export it with Ctrl+Shift+E if Audacity's scripted export fails) and the labels
 to rec/<name>.labels.json, which the align step uses instead of guessing.
 Without Audacity it still works as a plain teleprompter."""
 import json, os, sys, time
-from .labels import parse_getinfo
+from .labels import parse_getinfo, takes_from_labels
 
 EDIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REC = os.path.join(EDIT, "rec")
@@ -38,7 +38,11 @@ class AudacityPipe:
             raise OSError(f"Audacity: {command} -> {' '.join(out)[:200]}")
         return "\n".join(out[:-1])
 
-    def record(self): self.do("Record1stChoice:")
+    def record(self):  # always at the end of the project, never on top of an earlier take (e.g. after listening back)
+        self.do("SelectNone:"); self.do("CursProjectEnd:"); self.do("Record1stChoice:")
+
+    def play(self, a, b):
+        self.do("Stop:"); self.do(f"SelectTime: Start={a:.3f} End={b:.3f}"); self.do("Play:")
     def stop(self): self.do("Stop:")
     def labels(self): return parse_getinfo(self.do("GetInfo: Type=Labels Format=JSON"))
     def label_count(self): return len(self.labels())
@@ -143,6 +147,26 @@ class Session:
             n = self.marked.count(self.line())
             self.status = f"Retake {n} of {self.line()}: read it again (the old take gets cut later)"
 
+    def listen(self):
+        """Play back the newest take of the line on screen, from its label to the next one (what the edit will use)."""
+        if not self.client:
+            self.status = "No Audacity connection: nothing to play back."
+            return
+        if self.recording:
+            self.toggle_record()
+            if not self.client:
+                return
+        line = self.line()
+        end = max((t for t, _ in self.saved), default=0.0) + 600  # last take: Audacity stops where the audio ends
+        takes, _ = takes_from_labels(self.saved, [line], end=end)
+        if line not in takes:
+            self.status = f"No take of {line} yet in this session. S to record it."
+            return
+        a, b = takes[line]
+        self._call(self.client.play, a, b)
+        if self.client:
+            self.status = f"Playing your take of {line}. P to hear it again, S to record it again, Space to move on."
+
     def back(self):
         if self.idx > 0:
             self.idx -= 1
@@ -171,7 +195,7 @@ def main():
     cur = tk.Label(root, bg=BG, fg=FG, justify="left", anchor="nw"); cur.pack(fill="both", expand=True, padx=60, pady=20)
     nxt = tk.Label(root, bg=BG, fg=DIM, justify="left", anchor="nw"); nxt.pack(fill="x", padx=60)
     bot = tk.Label(root, bg=BG, fg=DIM, font=("Segoe UI", 12), anchor="w",
-                   text="S record/stop   Space/Right next   R retake   Left back   Up/Down size   Esc quit")
+                   text="S record/stop   Space/Right next   R retake   P listen back   Left back   Up/Down size   Esc quit")
     bot.pack(fill="x", padx=40, pady=(10, 20))
 
     def draw(*_):
@@ -190,7 +214,7 @@ def main():
         root.bind(k, key(s.next))
     for k in ("<Left>", "<BackSpace>"):
         root.bind(k, key(s.back))
-    root.bind("r", key(s.retake)); root.bind("s", key(s.toggle_record))
+    root.bind("r", key(s.retake)); root.bind("s", key(s.toggle_record)); root.bind("p", key(s.listen))
     root.bind("<Up>", lambda e: (size.__setitem__(0, size[0] + 4), draw()))
     root.bind("<Down>", lambda e: (size.__setitem__(0, max(16, size[0] - 4)), draw()))
 

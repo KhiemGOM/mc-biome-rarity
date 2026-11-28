@@ -128,3 +128,9 @@ def test_loop_crossfade_has_no_dip():
     tr = np.ones((300, 2), np.float32)
     out = place(tr, 100, 8.0, xfade=0.5)
     assert out.min() > 0.99  # equal-gain crossfade of a constant stays constant
+
+
+def test_music_ducks_under_clips_too():
+    its2 = its() + [Item("K001", "clip", "1", "camman talking", clip=("abc", 0.0, 3.0))]
+    t = dict(TIMES, K001=(21.0, 24.0))
+    assert (21.0, 24.0) in speech_spans(its2, t)

@@ -159,3 +159,74 @@ def test_export_failure_keeps_connection_and_asks_for_manual_export(tmp_path):
     assert "ctrl+shift+e" in s.status.lower() and "part1.wav" in s.status
     s.next(); s.toggle_record()  # can keep recording afterwards
     assert s.recording
+
+
+# --- listen back (P): hear your last take of the line on screen
+
+class Player(Fake):
+    def play(self, a, b): self._do("play", a, b)
+
+
+def plays(f):
+    return [c for c in f.calls if c[0] == "play"]
+
+
+def test_listen_plays_this_lines_take_up_to_the_next_label(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.next(); s.next(); s.toggle_record()  # labels at 1, 2, 3
+    s.back()  # on V002
+    s.listen()
+    assert plays(f) == [("play", 2.0, 3.0)] and "V002" in s.status
+
+
+def test_listen_while_recording_stops_and_saves_first(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.next()
+    s.listen()
+    assert not s.recording and (tmp_path / "p.labels.json").exists()
+    assert plays(f) and plays(f)[0][1] == 2.0  # V002, the line on screen
+
+
+def test_listen_after_a_retake_plays_the_newest_take(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.retake(); s.next(); s.toggle_record()  # V001 at 1 and 2, V002 at 3
+    s.back(); s.listen()
+    assert plays(f) == [("play", 2.0, 3.0)]
+
+
+def test_listen_on_the_last_recorded_line_plays_to_the_end(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.toggle_record()
+    s.listen()
+    (_, a, b), = plays(f)
+    assert a == 1.0 and b > a + 30  # no next label: let Audacity play until the audio runs out
+
+
+def test_listen_on_a_line_with_no_take_says_so(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.toggle_record()
+    s.next(); s.listen()
+    assert plays(f) == [] and "no take" in s.status.lower() and "V002" in s.status
+
+
+def test_listen_without_audacity_explains():
+    s = Session(IDS, None)
+    s.listen()
+    assert "audacity" in s.status.lower()
+
+
+def test_listen_survives_audacity_failing(tmp_path):
+    f = Player(); s = Session(IDS, f, out=str(tmp_path / "p"))
+    s.toggle_record(); s.toggle_record()
+    f.fail = True
+    s.listen()
+    assert s.client is None and "lost" in s.status.lower()
+
+
+def test_recording_always_starts_at_the_end_of_the_project():
+    # after listening, Audacity's cursor sits inside an old take: a new recording there would land on top of it
+    from vo.prompter import AudacityPipe
+    p = AudacityPipe.__new__(AudacityPipe); sent = []
+    p.do = lambda c: sent.append(c) or ""
+    p.record()
+    assert sent[-1] == "Record1stChoice:" and any(c.startswith("CursProjectEnd") for c in sent[:-1])

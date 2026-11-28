@@ -1,7 +1,9 @@
 # Recording the voice-over
 
-What to read: [`VO_READ.md`](VO_READ.md). It's the v4 script with only the spoken lines, numbered V001 to V087,
+What to read: [`VO_READ.md`](VO_READ.md). It's the v4 script with only the spoken lines, numbered V001 to V095,
 grouped by section. *(pause)* means take a beat before the next line. Don't say the numbers out loud.
+*(camman: "...")* lines are his clips: they're dropped in automatically, so just read your lines back to back,
+as replies to him. Leave a little quiet before and after each line: it gets trimmed off.
 
 ## The short version (with the teleprompter)
 
@@ -11,10 +13,10 @@ grouped by section. *(pause)* means take a beat before the next line. Don't say 
    ```
    .venv\Scripts\python -m vo.prompter part1
    ```
-   or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V034`
+   or start from a later line: `.venv\Scripts\python -m vo.prompter part2 --from V042` (section 2)
 3. In the teleprompter window: **S** starts recording (record about 10 s of silence first, then press **R** to
-   mark line 1 again), read the big line, **Space** for the next one. Flubbed it? **R** and read the line again. **Left**
-   goes back a line. **S** again stops and saves `rec/part1.labels.json`. Then export the audio once: in Audacity
+   mark line 1 again), read the big line, **Space** for the next one. Flubbed it? **R** and read the line again. **P** plays back your last
+   take of the line on screen (stops recording first; **S** carries on). **Left** goes back a line. **S** again stops and saves `rec/part1.labels.json`. Then export the audio once: in Audacity
    **Ctrl+Shift+E**, save the whole project (don't trim anything) as `rec\part1.wav`. Audacity 3.7's scripted export
    fails on this PC, so the teleprompter reminds you. Esc quits.
 4. Record in as many parts as you like (one Audacity project per part, close it without saving after the export). Then run the parts in script order:

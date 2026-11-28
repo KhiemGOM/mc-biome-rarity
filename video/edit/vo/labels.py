@@ -39,12 +39,12 @@ def takes_from_labels(labels, ids, end, min_len=0.4):
     return takes, [i for i in ids if i not in spans]
 
 
-def speech_bounds(a, sr, start, stop, skip=0.15, pad=0.06, frame=0.01):
+def speech_bounds(a, sr, start, stop, skip=0.15, pad=0.06, frame=0.01, tail=0.15):
     """Trim a take to the speech inside [start, stop] seconds of 16-bit samples `a`. Skips `skip` seconds after the
-    label (the keypress click). Threshold: 4x the take's quiet floor (10th percentile frame RMS), at least about
+    label (the keypress click) and the last `tail` seconds before the next one (the click of the key that moved on). Threshold: 4x the take's quiet floor (10th percentile frame RMS), at least about
     -50 dBFS. Returns (s, e) in seconds with `pad` kept around the speech, or None if the take is silent."""
     n = max(1, int(frame * sr))
-    i0, i1 = int((start + skip) * sr), min(len(a), int(stop * sr))
+    i0, i1 = int((start + skip) * sr), min(len(a), int((stop - tail) * sr))
     rms = []
     for i in range(i0, i1, n):
         seg = a[i:i + n]

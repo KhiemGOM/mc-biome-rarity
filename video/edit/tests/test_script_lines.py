@@ -102,3 +102,62 @@ def test_real_script_parses():
     assert len(vo) > 60
     assert {i.section for i in vo} == {"0", "1", "2", "3", "4", "4b", "4c", "5"}
     assert not any(i.text.startswith("[") for i in vo)
+
+
+# [CLIP: ...]: a piece of someone else's video that plays with its own audio (camman speaking)
+import pytest
+from vo.script_lines import parse as _parse
+
+CLIPS = """## 0. Cold open
+
+[CLIP: RTu-RkcdXpE 0.00-2.10 "What's the rarest biome in Minecraft?"]
+
+[VISUAL: thumbnail wall]
+
+[CLIP: d9Xmt9vhyRY 2.70-8.15 "It's not even in the top five rarest."]
+
+If you've ever googled that, you've watched camman18.
+
+[CLIP: 12UgiwOo28k 27.10-30.50 "And in first place, the pale garden?"]
+
+[beat]
+
+Oh. So the first two were fake?
+"""
+
+
+def test_clip_line_becomes_a_clip_item():
+    k = [i for i in _parse(CLIPS) if i.kind == "clip"][0]
+    assert (k.id, k.section, k.text, k.clip) == ("K001", "0", "What's the rarest biome in Minecraft?", ("RTu-RkcdXpE", 0.0, 2.1))
+
+
+def test_clips_keep_script_order_and_do_not_shift_vo_numbers():
+    assert [i.id for i in _parse(CLIPS)] == ["K001", "K002", "V001", "K003", "V002"]
+
+
+def test_visual_before_a_clip_waits_for_the_next_vo_line():
+    its = {i.id: i for i in _parse(CLIPS)}
+    assert its["K002"].visuals == [] and its["V001"].visuals == ["VISUAL: thumbnail wall"]
+
+
+def test_beat_after_a_clip_pauses_after_the_clip():
+    its = {i.id: i for i in _parse(CLIPS)}
+    assert its["K003"].pause_after and not its["V001"].pause_after
+
+
+def test_vo_lines_still_read_normally_around_clips():
+    assert [i.text for i in _parse(CLIPS) if i.kind == "vo"] == [
+        "If you've ever googled that, you've watched camman18.", "Oh. So the first two were fake?"]
+
+
+@pytest.mark.parametrize("bad", ['[CLIP: RTu-RkcdXpE "no range"]', '[CLIP: RTu-RkcdXpE 5.0-2.0 "backwards"]',
+                                 '[CLIP: 0.0-2.0 "no id"]'])
+def test_malformed_clip_is_an_error_that_shows_the_line(bad):
+    with pytest.raises(ValueError, match="CLIP"):
+        _parse("## 0. Cold open\n\n" + bad + "\n")
+
+
+def test_read_script_shows_clips_as_cues_without_a_number():
+    out = read_script(_parse(CLIPS))
+    assert "(camman: \"What's the rarest biome in Minecraft?\")" in out and "K001" not in out
+    assert "**V001**" in out

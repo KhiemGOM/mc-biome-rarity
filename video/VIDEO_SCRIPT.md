@@ -11,38 +11,96 @@ Sprint times use 5.612 blocks per second.
 
 Voice over is plain text. `[VISUAL: ...]` is what is on screen. `[GAG: ...]` is a quick visual joke, built in Resolve
 (text pop, zoom, freeze frame). `[CHECK: ...]` is something to confirm before recording. `[beat]` means a short pause.
+`[CLIP: <youtube id> <in>-<out> "what he says"]` plays that piece of camman's video with his own sound (not read
+aloud; times in seconds from `assets/00_cold_open/camman18/`).
 
 ---
 
 ## 0. Cold open
 
+[CLIP: RTu-RkcdXpE 0.00-2.10 "What's the rarest biome in Minecraft?"]
+
 [VISUAL: thumbnail wall of camman18's rarest biome videos, credited on screen]
 
-If you've ever googled "rarest biome in Minecraft", you've watched camman18. And if you've watched camman18, you've watched him change his answer. A lot.
+If you've ever googled that, you've watched camman18. And if you've watched camman18, you've watched him change his answer. A lot.
 
-[VISUAL: the April 2021 short, then the 1.17 video, each with its title big on screen]
+[VISUAL: the April 2021 short, title big on screen]
 
-First, in 2021: "The Rarest Biome in Minecraft." Modified jungle edge. Then, a couple of months later: "the rarest biome in Minecraft 1.17." Still modified jungle edge, and mushroom fields weren't even in his top five. Consistent. Respect.
+2021.
+
+[CLIP: RTu-RkcdXpE 7.85-11.20 "The rarest biome is actually the Modified Jungle Edge"]
+
+[VISUAL: the 1.17 video, title big on screen]
+
+A couple of months later.
+
+[CLIP: d9Xmt9vhyRY 2.70-8.15 "You might think it's the Mushroom Island, but it's not even close. It's not even in the top five rarest."]
+
+[CLIP: d9Xmt9vhyRY 23.65-27.45 "The rarest biome in Minecraft is the Modified Jungle's Edge"]
+
+[VISUAL: the 1.17 video thumbnail]
+
+Still modified jungle edge. Consistent. Respect.
 
 [VISUAL: pale garden short, title on screen]
 
-Then in 2026: "The REAL Rarest Biome in Minecraft." Oh. So the first two were fake? Now it's the pale garden.
+Then, 2026: "The REAL Rarest Biome in Minecraft."
+
+[CLIP: 12UgiwOo28k 27.10-30.50 "And in first place, the pale garden?"]
+
+[VISUAL: pale garden short thumbnail]
+
+Oh. So the first two were fake?
+
+[CLIP: ZnfLg6UiDYw 0.00-6.70 "The rarest biome in Minecraft isn't the Pale Garden. I did say this like, a month ago, oops,"]
+
+[VISUAL: windswept gravelly hills short thumbnail]
+
+Oops.
+
+[CLIP: ZnfLg6UiDYw 39.22-41.90 "meaning the rarest biome in Minecraft by surface area,"]
+
+[CLIP: ZnfLg6UiDYw 46.05-48.40 "is the windswept gravelly hills."]
 
 [VISUAL: windswept gravelly hills short, title on screen]
 
-Then the pale garden got bigger in an update, so: "the REAL, real rarest biome." Windswept gravelly hills.
+"The REAL, real rarest biome." Okay.
 
-[VISUAL: eroded badlands short, title on screen]
+[CLIP: HVfXIyuudTY 0.00-6.05 "While the windswept Gravely Hills takes up the least amount of the Minecraft world, it's not exactly the rarest biome."]
 
-Then he measured it a different way: "the REAL, real, real rarest biome." Eroded badlands.
+[VISUAL: eroded badlands short thumbnail]
+
+Of course it's not.
+
+[CLIP: HVfXIyuudTY 34.00-36.02 "And by this metric, the rarest biome"]
+
+[CLIP: HVfXIyuudTY 37.52-39.60 "is the Eroded Badlands."]
+
+[NOTE: the eroded badlands cut skips "just beating out the mushroom fields" on purpose: no hints at #1 before the reveal.]
 
 Five videos. Four answers. Three reals. Camman, I love you, but the next one is going to be "the REAL, real, real, real rarest biome", and at some point that stops being a title and starts being a cry for help.
 
 [GAG: the five titles stack up one by one, each "real" popping in bigger: "The Rarest Biome", "the rarest biome 1.17", "The REAL Rarest Biome", "the REAL, real rarest biome", "the REAL, real, real rarest biome". A sixth slot types itself out: "the REAL, real, real, real rarest biome...?"]
 
-[VISUAL: quick cuts of forum posts and wiki pages, each naming a different biome]
+[VISUAL: wikiHow push-in on its claim]
 
-And the rest of the internet? Worse. Everyone has an answer. Nobody has a proof.
+And the rest of the internet? Worse. wikiHow: "the rarest biome is the windswept gravelly hills."
+
+[VISUAL: mcseedmap push-in on its claim]
+
+mcseedmap: "The rarest biome in Minecraft today is the Pale Garden."
+
+[VISUAL: rarest.org push-in on its claim]
+
+rarest.org: modified jungle edge. A biome that got deleted from the game in 2021.
+
+[data: modified jungle edge was removed in Java 1.18 (released 2021-11-30), merged into sparse jungle.]
+
+[VISUAL: oldest.org push-in on its claim]
+
+And oldest.org says... sunflower plains? Sure. Why not.
+
+Everyone has an answer. Nobody has a proof.
 
 [VISUAL: seed counter spinning up past 200,000, fast biome cuts]
 

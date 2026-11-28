@@ -145,3 +145,16 @@ def test_label_takes_silent_take_is_missing():
     a = array.array("h", silence(3.0))
     takes, missing = label_takes([([(0.0, "V001")], 3.0)], IDS[:1], a, SR)
     assert takes == {} and missing == ["V001"]
+
+
+# the key press for the NEXT line clicks at the very end of a take: it must not count as speech
+def test_click_at_the_end_of_a_take_is_not_speech():
+    a = array.array("h", silence(1.0) + tone(1.0) + silence(1.5) + tone(0.05) + silence(0.05))  # quiet tail, then a click
+    s, e = speech_bounds(a, SR, 0.0, len(a) / SR, pad=0.0)
+    assert abs(s - 1.0) < 0.02 and abs(e - 2.0) < 0.02
+
+
+def test_speech_right_up_to_the_end_is_still_kept_when_there_is_no_tail():
+    a = array.array("h", silence(1.0) + tone(1.0) + silence(0.5))
+    s, e = speech_bounds(a, SR, 0.0, len(a) / SR, pad=0.0)
+    assert abs(e - 2.0) < 0.02

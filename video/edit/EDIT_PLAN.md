@@ -14,7 +14,7 @@ rec/*.wav --(vo.run all)--> work/vo_edit.wav (tight VO) + work/rough_cut.fcpxml 
   re-recording.
 - **Bins:** `make_bins.ps1` hard-links the best assets into `media/<section>/`. Drag the folders into Resolve as bins.
 - **Timeline:** 1920x1080, 60 fps. V1 empty (the import's base gap), V2 visuals, V3 overlays, A1 voice-over, a marker
-  per script line. Keep everything named `SPOILER_` after V056 (the reveal).
+  per script line. Keep everything named `SPOILER_` after V064 (the reveal).
 - **Tools installed for this** (all local to `video/edit/`, git-ignored): `.venv` (faster-whisper on the GPU, rapidfuzz,
   num2words, pytest), `.tools/inter` (Inter font, same as the charts). Already on the PC: Resolve 18.6, Audacity 3.7,
   ffmpeg 9.
@@ -25,7 +25,7 @@ rec/*.wav --(vo.run all)--> work/vo_edit.wav (tight VO) + work/rough_cut.fcpxml 
 
 The import places every visual and the VO. The finishing passes are yours, in this order:
 
-1. **Picture fit:** stills come in scaled to fit. `SPOILER_ranking_all56_step_on_it.png` (V069, V075) is 1920x2160: add a
+1. **Picture fit:** stills come in scaled to fit. `SPOILER_ranking_all56_step_on_it.png` (V077, V083) is 1920x2160: add a
    slow vertical pan (Inspector > Transform, keyframe Position Y). Vertical camman clips: Inspector zoom to fill, or
    put them over a blurred copy of themselves.
 2. **Motion on stills:** a slow push-in (zoom 1.00 to 1.06 over the shot) on every chart keeps them alive.
@@ -40,17 +40,17 @@ The import places every visual and the VO. The finishing passes are yours, in th
 
 | Line | Gag |
 |---|---|
-| V006 | The five camman titles stack up one by one, each "real" popping in bigger, then a sixth slot types itself out: "the REAL, real, real, real rarest biome...?" |
-| V011 | "SOURCE: trust me bro" stamp slams onto the wiki scroll |
-| V023 | Tiny squiggly path doing loops next to the straight ray |
-| V032 | "nuanced" flashes on screen |
-| V033 | Small "no judgement" with a side-eye icon (on the 2b2t hack client line) |
-| V037 | Corner counter: "worlds walked: 215,000", then "blocks walked: a lot" |
-| V041 | "43%" slams on screen, small "oops" under it |
-| V052 | Freeze frame on the most boring grey rock of the peaks clip, caption "four hours for this" |
-| V050 to V054 | Countdown read in a top-ten-list announcer voice ("NUM-BER FIVE"), voice only, no other channel's branding |
-| V056 | Crown drops onto the mushroom island |
-| V083 | "the REAL, real, real, real rarest biome" title, styled like camman's, with your name |
+| V010 | The five camman titles stack up one by one, each "real" popping in bigger, then a sixth slot types itself out: "the REAL, real, real, real rarest biome...?" |
+| V019 | "SOURCE: trust me bro" stamp slams onto the wiki scroll |
+| V031 | Tiny squiggly path doing loops next to the straight ray |
+| V040 | "nuanced" flashes on screen |
+| V041 | Small "no judgement" with a side-eye icon (on the 2b2t hack client line) |
+| V045 | Corner counter: "worlds walked: 215,000", then "blocks walked: a lot" |
+| V049 | "43%" slams on screen, small "oops" under it |
+| V060 | Freeze frame on the most boring grey rock of the peaks clip, caption "four hours for this" |
+| V058 to V062 | Countdown read in a top-ten-list announcer voice ("NUM-BER FIVE"), voice only, no other channel's branding |
+| V064 | Crown drops onto the mushroom island |
+| V091 | "the REAL, real, real, real rarest biome" title, styled like camman's, with your name |
 
 ## Music
 
@@ -86,11 +86,11 @@ http://creativecommons.org/licenses/by/4.0/
 
 - **VO:** not recorded yet. See `VO_GUIDE.md`.
 - **C8:** talking head for the outro (optional, the cut works without it).
-- **Filled 2026-11-28:** V007 forum and wiki screenshots (`assets/00_cold_open/forum_wiki/`, sources and credits in its
+- **Filled 2026-11-28:** V015 forum and wiki screenshots (`assets/00_cold_open/forum_wiki/`, sources and credits in its
   SOURCES.md).
 - **Filled 2026-11-28:** section 1 "why this definition" visuals (player path, grid walk vs straight line on a real
-  world plus the 400-world comparison chart, noise vs static, made-up turn settings, three ways to count "found"), V038
+  world plus the 400-world comparison chart, noise vs static, made-up turn settings, three ways to count "found"), V046
   Cubiomes vs the real game (seed 279 river orbit, dot synced to the clip), and the gag overlays. Generator:
   `assets/_generator/justify.py`, numbers in `assets/_generator/out/walk_compare.json`.
-- **Filled 2026-11-27:** old growth spruce and pine taiga and sparse jungle (V075), sulfur, dripstone and lush caves
-  (V078). See `assets/footage/SHOTS.md`.
+- **Filled 2026-11-27:** old growth spruce and pine taiga and sparse jungle (V083), sulfur, dripstone and lush caves
+  (V086). See `assets/footage/SHOTS.md`.

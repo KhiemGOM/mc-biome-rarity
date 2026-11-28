@@ -33,7 +33,7 @@ def section_spans(items, times, length):
 
 
 def speech_spans(items, times):
-    return [tuple(times[it.id]) for it in items if it.kind == "vo" and it.id in times]
+    return [tuple(times[it.id]) for it in items if it.kind in ("vo", "clip") and it.id in times]
 
 
 def find_line(items, text):

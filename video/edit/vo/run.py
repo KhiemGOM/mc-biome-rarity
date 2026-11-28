@@ -156,11 +156,15 @@ def cmd_align(*recs):
             n = int(card_len(it) * SR)
             edit_map[it.id] = (t, t + n / SR); out.extend(array.array("h", bytes(2 * n))); t += n / SR
             continue
-        if it.id not in res:
+        if it.kind == "clip":  # someone else's video: its own audio goes in the voice-over track
+            from .clips import clip_audio, find_clip
+            seg = array.array("h"); seg.frombytes(clip_audio(os.path.join(MEDIA, find_clip(MEDIA, it.clip[0])), it.clip[1], it.clip[2], SR))
+        elif it.id not in res:
             continue
-        a, b = res[it.id]
-        i0, i1 = max(0, int((a - PAD) * SR)), min(len(src), int((b + PAD) * SR))
-        seg = src[i0:i1]
+        else:
+            a, b = res[it.id]
+            i0, i1 = max(0, int((a - PAD) * SR)), min(len(src), int((b + PAD) * SR))
+            seg = src[i0:i1]
         for k in range(min(fade, len(seg))):  # 10 ms fades: no clicks at the cuts
             g = k / fade; seg[k] = int(seg[k] * g); seg[-1 - k] = int(seg[-1 - k] * g)
         edit_map[it.id] = (t, t + len(seg) / SR)
@@ -179,7 +183,8 @@ def cmd_timeline():
     m = json.load(open(os.path.join(WORK, "vo_edit_map.json")))
     its = items()
     times = {k: tuple(v) for k, v in m["edit"].items()}
-    cuts = load(CUTS)
+    from .clips import clip_cuts
+    cuts = {**load(CUTS), **clip_cuts(its, MEDIA)}
     order = [i.id for i in its]
     segs = [(s, 1) for s in segments(order, times, cuts, end=m["length"])]
     segs += [(s, 2) for s in overlay_segments(order, times, load_overlays(CUTS))]

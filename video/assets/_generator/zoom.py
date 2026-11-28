@@ -35,7 +35,7 @@ def lerp_box(a, b, t):
 SITES = {"wikihow": "wikihow.com", "mcseedmap": "mcseedmap.org", "rarest_org": "rarest.org", "oldest_org": "oldest.org"}
 
 
-def render(folder, secs=3.0, fps=30, hold0=0.1, move=0.7):
+def render(folder, secs=6.0, fps=30, hold0=0.1, move=0.7):
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
     here = os.path.dirname(os.path.abspath(__file__))
