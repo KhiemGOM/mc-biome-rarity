@@ -18,11 +18,18 @@ WORK = os.path.join(EDIT, "work")
 MEDIA = os.path.join(EDIT, "media")
 CUTS = os.path.join(EDIT, "cuts.csv")
 SR = 48000
-GAP, PAUSE, PAD = 0.30, 0.80, 0.06      # seconds between lines, after a [beat], kept around each take
+GAP, PAUSE, PAD = 0.45, 0.80, 0.06      # seconds between lines, after a [beat], kept around each take
+CLIP_GAP = 0.60                          # seconds before and after one of camman's clips
 CARD = {"title card": 4.0}               # silent cards, by words in their visual; default 3 s
 STILLS = (".png", ".jpg", ".jpeg")
 PROMPT = ("Minecraft, camman18, mushroom fields, windswept gravelly hills, eroded badlands, stony peaks, ice spikes, "
           "pale garden, mangrove swamp, cherry grove, dappled forest, deep dark, ancient city, Cubiomes, Monte Carlo, SMP.")
+
+
+def gap_after(it, nxt):
+    """Silence after item `it` when `nxt` comes next (None at the end)."""
+    g = CLIP_GAP if it.kind == "clip" or (nxt is not None and nxt.kind == "clip") else GAP
+    return max(g, PAUSE) if it.pause_after else g
 
 
 def items():
@@ -151,7 +158,8 @@ def cmd_align(*recs):
         res, missing = align([(i.id, i.text) for i in its if i.kind == "vo"], words)
     out, edit_map, t = array.array("h"), {}, 0.0
     fade = int(0.01 * SR)
-    for it in its:
+    for k, it in enumerate(its):
+        nxt = its[k + 1] if k + 1 < len(its) else None
         if it.kind == "card":
             n = int(card_len(it) * SR)
             edit_map[it.id] = (t, t + n / SR); out.extend(array.array("h", bytes(2 * n))); t += n / SR
@@ -169,7 +177,7 @@ def cmd_align(*recs):
             g = k / fade; seg[k] = int(seg[k] * g); seg[-1 - k] = int(seg[-1 - k] * g)
         edit_map[it.id] = (t, t + len(seg) / SR)
         out.extend(seg); t += len(seg) / SR
-        gap = int((PAUSE if it.pause_after else GAP) * SR)
+        gap = int(gap_after(it, nxt) * SR)
         out.extend(array.array("h", bytes(2 * gap))); t += gap / SR
     write_pcm(os.path.join(WORK, "vo_edit.wav"), out)
     json.dump({"source": os.path.abspath(rec), "takes": res, "edit": edit_map, "missing": missing, "length": t},
