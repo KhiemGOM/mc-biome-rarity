@@ -23,7 +23,7 @@ def sec(v):
     return 0.0 if v == "0s" else int(v.split("/")[0]) / int(v.split("/")[1][:-1])
 
 
-def build_base(base, src, total, out):
+def build_base(base, src, total, out, end=None):
     tmp = tempfile.mkdtemp()
     parts, t = [], 0.0
 
@@ -32,8 +32,12 @@ def build_base(base, src, total, out):
         ff("-f", "lavfi", "-i", f"color=c={BG}:s={W}x{H}:r={FPS}:d={d:.3f}", "-pix_fmt", "yuv420p", p)
         parts.append(p)
 
+    total = min(total, end) if end else total
     for k, c in enumerate(base):
         o, d, s = sec(c.get("offset")), sec(c.get("duration")), sec(c.get("start"))
+        if o >= total:
+            break
+        d = min(d, total - o)
         if o > t + 0.01:
             black(o - t)
         f = src[c.get("ref")]
@@ -64,9 +68,9 @@ def main():
     base, over, vo, music = lane("1"), lane("2"), lane("-1")[0], lane("-2")
     total = sec(root.find(".//sequence").get("duration"))  # the voice-over is one clip per line, all from vo_edit.wav
     end = min(total, a.until) if a.until else total
-    joined = os.path.join(WORK, "preview_base.mp4")
+    joined = os.path.join(WORK, "preview_base.mp4" if end == total else "preview_base_part.mp4")
     if not (a.reuse_base and os.path.exists(joined)):
-        build_base(base, src, total, joined)
+        build_base(base, src, total, joined, end=end)
 
     inputs, fc, last = ["-i", joined, "-i", src[vo.get("ref")]], [], "0:v"
     audio = "[1:a]aformat=channel_layouts=stereo"

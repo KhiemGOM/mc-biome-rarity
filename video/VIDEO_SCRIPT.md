@@ -18,7 +18,7 @@ aloud; times in seconds from `assets/00_cold_open/camman18/`).
 
 ## 0. Cold open
 
-[CLIP: RTu-RkcdXpE 0.00-2.10 "What's the rarest biome in Minecraft?"]
+[CLIP: RTu-RkcdXpE 0.00-2.39 "What's the rarest biome in Minecraft?"]
 
 [VISUAL: thumbnail wall of camman18's rarest biome videos, credited on screen]
 
@@ -28,15 +28,15 @@ If you've ever googled that, you've watched camman18. And if you've watched camm
 
 2021.
 
-[CLIP: RTu-RkcdXpE 7.85-11.20 "The rarest biome is actually the Modified Jungle Edge"]
+[CLIP: RTu-RkcdXpE 7.92-16.43 "The rarest biome is actually the Modified Jungle Edge and only covers 0.0001% of the world."]
 
 [VISUAL: the 1.17 video, title big on screen]
 
 A couple of months later.
 
-[CLIP: d9Xmt9vhyRY 2.70-8.15 "You might think it's the Mushroom Island, but it's not even close. It's not even in the top five rarest."]
+[CLIP: d9Xmt9vhyRY 2.68-8.14 "You might think it's the Mushroom Island, but it's not even close. It's not even in the top five rarest."]
 
-[CLIP: d9Xmt9vhyRY 23.65-27.45 "The rarest biome in Minecraft is the Modified Jungle's Edge"]
+[CLIP: d9Xmt9vhyRY 23.58-27.45 "The rarest biome in Minecraft is the Modified Jungle's Edge"]
 
 [VISUAL: the 1.17 video thumbnail]
 
@@ -46,37 +46,37 @@ Still modified jungle edge. Consistent. Respect.
 
 Then, 2026: "The REAL Rarest Biome in Minecraft."
 
-[CLIP: 12UgiwOo28k 27.10-30.50 "And in first place, the pale garden?"]
+[CLIP: 12UgiwOo28k 27.08-30.81 "And in first place, the pale garden?"]
 
 [VISUAL: pale garden short thumbnail]
 
 Oh. So the first two were fake?
 
-[CLIP: ZnfLg6UiDYw 0.00-6.70 "The rarest biome in Minecraft isn't the Pale Garden. I did say this like, a month ago, oops,"]
+[CLIP: ZnfLg6UiDYw 0.00-6.95 "The rarest biome in Minecraft isn't the Pale Garden. I did say this like, a month ago, oops,"]
 
 [VISUAL: windswept gravelly hills short thumbnail]
 
 Oops.
 
-[CLIP: ZnfLg6UiDYw 39.22-41.90 "meaning the rarest biome in Minecraft by surface area,"]
+[CLIP: ZnfLg6UiDYw 39.30-41.93 "meaning the rarest biome in Minecraft by surface area,"]
 
-[CLIP: ZnfLg6UiDYw 46.05-48.40 "is the windswept gravelly hills."]
+[CLIP: ZnfLg6UiDYw 46.09-48.88 "is the windswept gravelly hills."]
 
 [VISUAL: windswept gravelly hills short, title on screen]
 
 "The REAL, real rarest biome." Okay.
 
-[CLIP: HVfXIyuudTY 0.00-6.05 "While the windswept Gravely Hills takes up the least amount of the Minecraft world, it's not exactly the rarest biome."]
+[CLIP: HVfXIyuudTY 0.00-6.20 "While the windswept Gravely Hills takes up the least amount of the Minecraft world, it's not exactly the rarest biome."]
 
 [VISUAL: eroded badlands short thumbnail]
 
 Of course it's not.
 
-[CLIP: HVfXIyuudTY 34.00-36.02 "And by this metric, the rarest biome"]
+[CLIP: HVfXIyuudTY 34.05-36.03 "And by this metric, the rarest biome"]
 
-[CLIP: HVfXIyuudTY 37.52-39.60 "is the Eroded Badlands."]
+[CLIP: HVfXIyuudTY 38.00-39.97 "the Eroded Badlands."]
 
-[NOTE: the eroded badlands cut skips "just beating out the mushroom fields" on purpose: no hints at #1 before the reveal.]
+[NOTE: the eroded badlands cut skips "just beating out the mushroom fields is" on purpose: no hints at #1 before the reveal. Every clip's in and out were checked by transcribing the faded clip: it must start and end on his exact words (2026-11-28).]
 
 Five videos. Four answers. Three reals. Camman, I love you, but the next one is going to be "the REAL, real, real, real rarest biome", and at some point that stops being a title and starts being a cry for help.
 

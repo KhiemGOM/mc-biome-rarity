@@ -1,5 +1,5 @@
 """[CLIP] lines: find the source video in video/edit/media, cut its audio for the voice-over track."""
-import glob, os, subprocess
+import array, glob, os, subprocess
 
 
 def find_clip(media, ref):
@@ -24,3 +24,14 @@ def clip_audio(path, a, b, sr):
     return subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", path, "-vn", "-ac", "1",
                            "-ar", str(sr), "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-f", "s16le", "-"],
                           capture_output=True, check=True).stdout
+
+
+def fade_edges(a, sr, sec):
+    """Linear fade in and out of `sec` seconds on 16-bit samples (shortened for very short clips)."""
+    out = array.array("h", a)
+    n = min(int(sec * sr), len(out) // 2)
+    for k in range(n):
+        g = k / n
+        out[k] = int(out[k] * g)
+        out[-1 - k] = int(out[-1 - k] * g)
+    return out

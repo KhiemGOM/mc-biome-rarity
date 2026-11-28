@@ -22,6 +22,7 @@ TWEAKS = os.path.join(EDIT, "tweaks.json")   # edits read back from Resolve (vo.
 SR = 48000
 GAP, PAUSE, PAD = 0.45, 0.80, 0.06      # seconds between lines, after a [beat], kept around each take
 CLIP_GAP = 0.60                          # seconds before and after one of camman's clips
+JUMP_GAP = 0.10                          # between two clips from the same video: one jump-cut sentence
 CARD = {"title card": 4.0}               # silent cards, by words in their visual; default 3 s
 STILLS = (".png", ".jpg", ".jpeg")
 PROMPT = ("Minecraft, camman18, mushroom fields, windswept gravelly hills, eroded badlands, stony peaks, ice spikes, "
@@ -31,6 +32,8 @@ PROMPT = ("Minecraft, camman18, mushroom fields, windswept gravelly hills, erode
 def gap_after(it, nxt):
     """Silence after item `it` when `nxt` comes next (None at the end)."""
     g = CLIP_GAP if it.kind == "clip" or (nxt is not None and nxt.kind == "clip") else GAP
+    if it.kind == "clip" and nxt is not None and nxt.kind == "clip" and it.clip[0] == nxt.clip[0]:
+        g = JUMP_GAP
     return max(g, PAUSE) if it.pause_after else g
 
 
@@ -168,8 +171,9 @@ def cmd_align(*recs):
             edit_map[it.id] = (t, t + n / SR); out.extend(array.array("h", bytes(2 * n))); t += n / SR
             continue
         if it.kind == "clip":  # someone else's video: its own audio goes in the voice-over track
-            from .clips import clip_audio, find_clip
+            from .clips import clip_audio, fade_edges, find_clip
             seg = array.array("h"); seg.frombytes(clip_audio(os.path.join(MEDIA, find_clip(MEDIA, it.clip[0])), it.clip[1], it.clip[2], SR))
+            seg = fade_edges(seg, SR, 0.05)  # his background music must not snap on or off
         elif it.id not in res:
             continue
         else:
