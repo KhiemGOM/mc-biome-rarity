@@ -54,3 +54,16 @@ def test_single_overlay_still_covers_its_whole_line():
     from vo.cuts import overlay_segments
     segs = overlay_segments(["V001"], {"V001": (1.0, 4.0)}, {"V001": "lt.png"})
     assert segs == [("lt.png", 0.0, 1.0, 4.0)]
+
+
+def test_segments_can_carry_line_keys():
+    order = ["V001", "V002"]
+    times = {"V001": (0.0, 2.0), "V002": (2.5, 5.0)}
+    segs = segments(order, times, {"V001": "a.mp4;b.png"}, end=6.0, keys=True)
+    assert [s[0] for s in segs] == ["V001#0", "V001#1"] and segs[0][1:] == ("a.mp4", 0.0, 0.0, 3.0)
+
+
+def test_overlay_segments_keys_are_marked_as_overlays():
+    from vo.cuts import overlay_segments
+    segs = overlay_segments(["V001"], {"V001": (0.0, 2.0)}, {"V001": "gag.png"}, keys=True)
+    assert segs == [("ov:V001#0", "gag.png", 0.0, 0.0, 2.0)]

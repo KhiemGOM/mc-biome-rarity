@@ -18,21 +18,21 @@ def load(path):
         return {r["id"]: r["files"] for r in csv.DictReader(f)}
 
 
-def segments(order, times, cuts, end):
+def segments(order, times, cuts, end, keys=False):
     """order: item ids in script order. times: {id: (start, end)} for items that exist in the edit.
     A line with files starts a new visual that holds until the next line with files (or `end`)."""
     for k in cuts:
         if k not in order:
             raise KeyError(f"cuts.csv names {k}, which is not in the script")
-    starts = [(times[i][0], parse_files(cuts.get(i, ""))) for i in order if i in times and parse_files(cuts.get(i, ""))]
+    starts = [(times[i][0], parse_files(cuts.get(i, "")), i) for i in order if i in times and parse_files(cuts.get(i, ""))]
     segs = []
-    for n, (s, files) in enumerate(starts):
+    for n, (s, files, owner) in enumerate(starts):
         e = starts[n + 1][0] if n + 1 < len(starts) else end
         step = (e - s) / len(files)
         for k, (path, src_in) in enumerate(files):
             a = s + k * step
             b = e if k == len(files) - 1 else s + (k + 1) * step
-            segs.append((path, src_in, a, b))
+            segs.append(((f"{owner}#{k}",) if keys else ()) + (path, src_in, a, b))
     return segs
 
 
@@ -41,7 +41,7 @@ def load_overlays(path):
         return {r["id"]: r.get("overlay", "") for r in csv.DictReader(f)}
 
 
-def overlay_segments(order, times, overlays):
+def overlay_segments(order, times, overlays, keys=False):
     """Overlays (lower thirds, notes, gags) show for their own line only, not held. Several on one line take turns,
     splitting the line evenly in the order given, so they never sit on top of each other on the overlay track."""
     segs = []
@@ -52,5 +52,5 @@ def overlay_segments(order, times, overlays):
             for k, (path, src_in) in enumerate(files):
                 a = s + (e - s) * k / len(files)
                 b = e if k == len(files) - 1 else s + (e - s) * (k + 1) / len(files)
-                segs.append((path, src_in, a, b))
+                segs.append(((f"ov:{i}#{k}",) if keys else ()) + (path, src_in, a, b))
     return segs

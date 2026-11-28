@@ -11,12 +11,14 @@ import array, json, os, subprocess, sys, wave
 from .script_lines import parse, read_script
 from .cuts import load, load_overlays, overlay_segments, segments
 from .timeline import Clip, build_fcpxml
+from . import tweaks as tw
 
 EDIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(EDIT, "..", "VIDEO_SCRIPT.md")
 WORK = os.path.join(EDIT, "work")
 MEDIA = os.path.join(EDIT, "media")
 CUTS = os.path.join(EDIT, "cuts.csv")
+TWEAKS = os.path.join(EDIT, "tweaks.json")   # edits read back from Resolve (vo.tweaks import)
 SR = 48000
 GAP, PAUSE, PAD = 0.45, 0.80, 0.06      # seconds between lines, after a [beat], kept around each take
 CLIP_GAP = 0.60                          # seconds before and after one of camman's clips
@@ -156,6 +158,7 @@ def cmd_align(*recs):
         words = transcribe(clean)
         from .align import align
         res, missing = align([(i.id, i.text) for i in its if i.kind == "vo"], words)
+    tweaks = tw.load(TWEAKS)
     out, edit_map, t = array.array("h"), {}, 0.0
     fade = int(0.01 * SR)
     for k, it in enumerate(its):
@@ -177,10 +180,10 @@ def cmd_align(*recs):
             g = k / fade; seg[k] = int(seg[k] * g); seg[-1 - k] = int(seg[-1 - k] * g)
         edit_map[it.id] = (t, t + len(seg) / SR)
         out.extend(seg); t += len(seg) / SR
-        gap = int(gap_after(it, nxt) * SR)
+        gap = int(max(0.0, tw.gap_for(it.id, gap_after(it, nxt), tweaks)) * SR)
         out.extend(array.array("h", bytes(2 * gap))); t += gap / SR
     write_pcm(os.path.join(WORK, "vo_edit.wav"), out)
-    json.dump({"source": os.path.abspath(rec), "takes": res, "edit": edit_map, "missing": missing, "length": t},
+    json.dump({"source": os.path.abspath(rec), "recs": [os.path.abspath(r) for r in recs], "takes": res, "edit": edit_map, "missing": missing, "length": t},
               open(os.path.join(WORK, "vo_edit_map.json"), "w"), indent=1)
     print(f"work/vo_edit.wav: {t / 60:.1f} min, {len(res)} lines kept")
     if missing:
@@ -194,28 +197,30 @@ def cmd_timeline():
     from .clips import clip_cuts
     cuts = {**load(CUTS), **clip_cuts(its, MEDIA)}
     order = [i.id for i in its]
-    segs = [(s, 1) for s in segments(order, times, cuts, end=m["length"])]
-    segs += [(s, 2) for s in overlay_segments(order, times, load_overlays(CUTS))]
+    keyed = [k + (1,) for k in segments(order, times, cuts, end=m["length"], keys=True)]
+    keyed += [k + (2,) for k in overlay_segments(order, times, load_overlays(CUTS), keys=True)]
+    keyed, tnotes = tw.apply_visuals_keyed(keyed, tw.load(TWEAKS), times)
     clips, durs = [], {}
-    for (rel, src_in, a, b), lane in segs:
+    for key, rel, src_in, a, b, lane in keyed:
         p = os.path.join(MEDIA, rel)
         if not os.path.exists(p):
-            raise FileNotFoundError(f"cuts.csv: {rel} is not in video/edit/media (run make_bins.ps1?)")
+            raise FileNotFoundError(f"cuts.csv or tweaks.json: {rel} is not in video/edit/media (run make_bins.ps1?)")
         kind = "still" if p.lower().endswith(STILLS) else "video"
         if kind == "video" and p not in durs:
             durs[p] = probe(p)
-        clips.append(Clip(p, a, b, kind=kind, src_dur=durs.get(p, 0.0), src_in=src_in, lane=lane))
+        clips.append(Clip(p, a, b, kind=kind, src_dur=durs.get(p, 0.0), src_in=src_in, lane=lane, key=key))
     marks = [(times[i.id][0], f"{i.id} {i.text[:60]}") for i in its if i.id in times and i.kind == "vo"]
     from .music import render_bed
     bed = os.path.join(WORK, "music_bed.wav")
     cues, notes = render_bed(its, times, m["length"], os.path.join(EDIT, "music"), bed)
     xml, warnings = build_fcpxml(clips, vo=(os.path.join(WORK, "vo_edit.wav"), m["length"]),
                                  name="Rarest biome rough cut", markers=sorted(marks + cues),
-                                 audio=[(bed, m["length"], -2, "music bed")])
+                                 audio=[(bed, m["length"], -2, "music bed")],
+                                 vo_pieces=[(a, b, a, i) for i, (a, b) in sorted(times.items(), key=lambda x: x[1][0])])
     out = os.path.join(WORK, "rough_cut.fcpxml")
     open(out, "w", encoding="utf-8").write(xml)
     print(f"work/rough_cut.fcpxml: {len(clips)} visuals, {len(marks)} line markers, {m['length'] / 60:.1f} min")
-    for w in notes + warnings:
+    for w in tnotes + notes + warnings:
         print("  note:", w)
 
 

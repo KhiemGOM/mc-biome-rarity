@@ -19,6 +19,12 @@ rec/*.wav --(vo.run all)--> work/vo_edit.wav (tight VO) + work/rough_cut.fcpxml 
   num2words, pytest), `.tools/inter` (Inter font, same as the charts). Already on the PC: Resolve 18.6, Audacity 3.7,
   ffmpeg 9.
 - **Watchable rough cut:** `.venv\Scripts\python make_preview.py` renders `work/rough_cut_preview.mp4` (visuals, overlays, VO, music) from the timeline; `--until 130` for a quick check, `--reuse-base` when only overlays or audio changed.
+- **Tweak it in Resolve and keep the tweaks:** import `work/rough_cut.fcpxml` (File > Import > Timeline). A1 has one
+  clip per script line, named V011, K003..., so you can drag lines apart for more room. Move shot edges, swap or add
+  shots, trim camman's clips. Then File > Export > Timeline > FCPXML 1.9 into `work/`, and run
+  `.venv\Scripts\python -m vo.tweaks import work\<export>.fcpxml`. Your edits go into `tweaks.json`, each anchored to
+  a script line, and get applied on every rebuild (also after you record). Shots you don't touch keep following
+  their lines. Color, effects, keyframes, transitions, titles and volume don't carry over: do those last, in Resolve.
 - **Tests:** `.venv\Scripts\python -m pytest` in `video/edit` (parser, take picker, cut list, FCPXML).
 
 ## What the rough cut gives you, and what's left to do by hand in Resolve

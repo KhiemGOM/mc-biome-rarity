@@ -1,6 +1,6 @@
 """Keep the cut list in step after VIDEO_SCRIPT.md is edited. Line ids (V001...) are just positions, so adding,
 splitting or deleting a paragraph shifts every id after it. This matches old lines to new ones by their words and
-renames the ids in make_cuts.py and EDIT_PLAN.md. Run from video/edit, BEFORE committing the script edit:
+renames the ids in make_cuts.py, EDIT_PLAN.md and tweaks.json. Run from video/edit, BEFORE committing the script edit:
 
   .venv\\Scripts\\python -m vo.remap            # old script = last commit, new = the file on disk
   .venv\\Scripts\\python -m vo.remap --dry-run  # just print the mapping
@@ -75,8 +75,10 @@ def main():
         print(f"  NEW {k}: {dict(new)[k][:70]}")
     if "--dry-run" in sys.argv:
         return
-    for name in ("make_cuts.py", "EDIT_PLAN.md"):
+    for name in ("make_cuts.py", "EDIT_PLAN.md", "tweaks.json"):
         p = os.path.join(edit, name)
+        if not os.path.exists(p):  # tweaks.json only exists after a Resolve import
+            continue
         text, n = rewrite_ids(open(p, encoding="utf-8", newline="").read(), mapping, dropped)
         open(p, "w", encoding="utf-8", newline="").write(text)
         print(f"{name}: {n} ids renamed")

@@ -62,7 +62,7 @@ def main():
     clips = list(root.iter("asset-clip"))
     lane = lambda n: sorted([c for c in clips if c.get("lane") == n], key=lambda c: sec(c.get("offset")))
     base, over, vo, music = lane("1"), lane("2"), lane("-1")[0], lane("-2")
-    total = sec(vo.get("duration"))
+    total = sec(root.find(".//sequence").get("duration"))  # the voice-over is one clip per line, all from vo_edit.wav
     end = min(total, a.until) if a.until else total
     joined = os.path.join(WORK, "preview_base.mp4")
     if not (a.reuse_base and os.path.exists(joined)):

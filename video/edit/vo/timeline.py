@@ -18,6 +18,7 @@ class Clip:
     src_dur: float = 0.0  # source length (video), seconds
     src_in: float = 0.0   # in point in the source, seconds
     lane: int = 1         # 1 = base visuals (V2 in Resolve), 2 = overlays (V3)
+    key: str = ""         # "V011#0": the line and slot it came from, so edits made in Resolve can be read back
 
 
 def frames(sec, fps=FPS):
@@ -33,9 +34,10 @@ def url(path):
     return "file:///" + quote(p.lstrip("/"), safe="/:")
 
 
-def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=(), audio=()):
+def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=(), audio=(), vo_pieces=None):
     """clips: [Clip]. vo: (wav path, duration seconds) or None. audio: extra [(path, seconds, lane, name)] from 0s,
-    e.g. the music bed on lane -2 (A2). Returns (xml string, [warnings])."""
+    e.g. the music bed on lane -2 (A2). vo_pieces: [(src start, src end, timeline start, name)] puts the voice-over on
+    A1 as one clip per line instead of one long clip. Returns (xml string, [warnings])."""
     for c in clips:
         if not os.path.exists(c.path):
             raise FileNotFoundError(c.path)
@@ -70,13 +72,18 @@ def build_fcpxml(clips, vo=None, name="rough cut", fps=FPS, markers=(), audio=()
                 e = s + avail
         aid = asset(c.path, c.kind, c.src_dur)
         body.append(f'<asset-clip ref="{aid}" lane="{c.lane}" offset="{t(s, fps)}" start="{t(frames(c.src_in, fps), fps)}" '
-                    f'duration="{t(e - s, fps)}" name={quoteattr(os.path.basename(c.path))}/>')
+                    f'duration="{t(e - s, fps)}" name={quoteattr((c.key + " " if c.key else "") + os.path.basename(c.path))}/>')
         last_end[c.lane] = e
         total = max(total, e)
     if vo:
         vd = frames(vo[1], fps)
         aid = asset(vo[0], "audio", vo[1])
-        body.append(f'<asset-clip ref="{aid}" lane="-1" offset="0s" start="0s" duration="{t(vd, fps)}" name="voice over"/>')
+        if vo_pieces is None:
+            body.append(f'<asset-clip ref="{aid}" lane="-1" offset="0s" start="0s" duration="{t(vd, fps)}" name="voice over"/>')
+        for a, b, at, nm in vo_pieces or ():
+            fa, fb, fo = frames(a, fps), frames(b, fps), frames(at, fps)
+            body.append(f'<asset-clip ref="{aid}" lane="-1" offset="{t(fo, fps)}" start="{t(fa, fps)}" '
+                        f'duration="{t(fb - fa, fps)}" name={quoteattr(nm)}/>')
         total = max(total, vd)
     for path, dur, lane, nm in audio:
         d = frames(dur, fps)
