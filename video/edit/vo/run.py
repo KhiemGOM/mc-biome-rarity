@@ -20,8 +20,10 @@ MEDIA = os.path.join(EDIT, "media")
 CUTS = os.path.join(EDIT, "cuts.csv")
 TWEAKS = os.path.join(EDIT, "tweaks.json")   # edits read back from Resolve (vo.tweaks import)
 SR = 48000
-GAP, PAUSE, PAD = 0.45, 0.80, 0.06      # seconds between lines, after a [beat], kept around each take
-CLIP_GAP = 0.60                          # seconds before and after one of camman's clips
+GAP, PAUSE, PAD = 0.70, 1.20, 0.06      # seconds between lines, after a [beat], kept around each take
+CLIP_GAP = 1.00                          # seconds before and after one of camman's clips (a beat to react)
+SECTION_GAP = 1.50                       # before a new section starts
+DISSOLVE, SECTION_DISSOLVE = 0.4, 0.8    # cross dissolve between shots, and into a new section
 JUMP_GAP = 0.10                          # between two clips from the same video: one jump-cut sentence
 CARD = {"title card": 4.0}               # silent cards, by words in their visual; default 3 s
 STILLS = (".png", ".jpg", ".jpeg")
@@ -34,6 +36,8 @@ def gap_after(it, nxt):
     g = CLIP_GAP if it.kind == "clip" or (nxt is not None and nxt.kind == "clip") else GAP
     if it.kind == "clip" and nxt is not None and nxt.kind == "clip" and it.clip[0] == nxt.clip[0]:
         g = JUMP_GAP
+    if nxt is not None and nxt.section != it.section:
+        g = max(g, SECTION_GAP)
     return max(g, PAUSE) if it.pause_after else g
 
 
@@ -204,15 +208,38 @@ def cmd_timeline():
     keyed = [k + (1,) for k in segments(order, times, cuts, end=m["length"], keys=True)]
     keyed += [k + (2,) for k in overlay_segments(order, times, load_overlays(CUTS), keys=True)]
     keyed, tnotes = tw.apply_visuals_keyed(keyed, tw.load(TWEAKS), times)
+    for key, rel, *_ in keyed:
+        if not os.path.exists(os.path.join(MEDIA, rel)):
+            raise FileNotFoundError(f"cuts.csv or tweaks.json: {rel} is not in video/edit/media (run make_bins.ps1?)")
+    # dissolve into every shot, a longer one where a new section starts
+    sec_of, trans, prev = {i.id: i.section for i in its}, {}, None
+    for key, rel, src_in, a, b, lane in sorted((k for k in keyed if k[5] == 1), key=lambda k: k[3]):
+        here = sec_of.get(key.split("#")[0], prev)
+        trans[key] = SECTION_DISSOLVE if prev is not None and here != prev else DISSOLVE
+        prev = here
+    # stills on the main track get a slow push-in, baked into a clip per shot
+    from .motion import pad, pad_needed, render_all
+    jobs = [(os.path.join(MEDIA, rel), b - a) for key, rel, src_in, a, b, lane in keyed if lane == 1 and rel.lower().endswith(STILLS)]
+    print(f"push-ins: {len(set(jobs))} stills (cached in work/motion)")
+    motion = render_all(jobs, os.path.join(WORK, "motion"))
     clips, durs = [], {}
     for key, rel, src_in, a, b, lane in keyed:
         p = os.path.join(MEDIA, rel)
-        if not os.path.exists(p):
-            raise FileNotFoundError(f"cuts.csv or tweaks.json: {rel} is not in video/edit/media (run make_bins.ps1?)")
         kind = "still" if p.lower().endswith(STILLS) else "video"
+        if kind == "still" and lane == 1:
+            p, src_in, sd = motion[(os.path.join(MEDIA, rel), b - a)]
+            kind, durs[p] = "video", sd
         if kind == "video" and p not in durs:
             durs[p] = probe(p)
-        clips.append(Clip(p, a, b, kind=kind, src_dur=durs.get(p, 0.0), src_in=src_in, lane=lane, key=key))
+        if kind == "video" and lane == 1:  # no spare footage for the dissolve, or too short for its slot: hold a frame
+            head, tail = pad_needed(src_in, b - a, durs[p])
+            if head or tail:
+                p = pad(p, head, tail, os.path.join(WORK, "padded"))
+                src_in += head
+                if p not in durs:
+                    durs[p] = probe(p)
+        clips.append(Clip(p, a, b, kind=kind, src_dur=durs.get(p, 0.0), src_in=src_in, lane=lane, key=key,
+                          trans_in=trans.get(key, 0.0)))
     marks = [(times[i.id][0], f"{i.id} {i.text[:60]}") for i in its if i.id in times and i.kind == "vo"]
     from .music import render_bed
     bed = os.path.join(WORK, "music_bed.wav")

@@ -28,3 +28,13 @@ def test_gaps_are_ordered_sensibly():
 
 def test_two_clips_from_the_same_video_play_as_one_jump_cut():
     assert gap_after(K(ref="x"), K(ref="x")) == JUMP_GAP and JUMP_GAP < GAP
+
+
+def test_a_section_change_gets_a_longer_pause():
+    from vo.run import SECTION_GAP
+    a, b = Item("V001", "vo", "0", "end of cold open"), Item("V002", "vo", "1", "start of section 1")
+    assert gap_after(a, b) == SECTION_GAP and SECTION_GAP > PAUSE
+
+
+def test_pacing_has_room_to_breathe():
+    assert GAP >= 0.6 and CLIP_GAP >= 0.9 and PAUSE >= 1.0

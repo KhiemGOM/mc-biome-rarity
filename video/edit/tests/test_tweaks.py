@@ -54,6 +54,14 @@ def setsec(el, attr, s):
     el.set(attr, f"{round(s * FPS)}/{FPS}s")
 
 
+def attach(root, at, **attrs):
+    """Hang a new clip off the main-track element playing at `at` seconds, in that element's own time (as Resolve does)."""
+    els = [el for el in root.find(".//sequence/spine") if el.tag != "transition"]
+    parent = [el for el in els if sec(el.get("offset")) <= at + 1e-9][-1]
+    local = sec(parent.get("start") or "0s") + at - sec(parent.get("offset"))
+    ET.SubElement(parent, "asset-clip", offset=f"{round(local * FPS)}/{FPS}s", **attrs)
+
+
 def tw(media, new_xml, gen_xml=None):
     gen_xml = gen_xml or generated(media)
     return read_back(parse_fcpxml(new_xml), parse_fcpxml(gen_xml), ITEMS, TIMES, vo_name="vo_edit.wav",
@@ -63,13 +71,13 @@ def tw(media, new_xml, gen_xml=None):
 # --- the generated timeline carries what the round trip needs
 
 def test_voice_over_is_one_clip_per_line(media):
-    acs = [a for a in ET.fromstring(generated(media)).iter("asset-clip") if a.get("lane") == "-1"]
-    assert [a.get("name") for a in acs] == ["V001", "K001", "V002", "V003"]
-    assert sec(acs[2].get("offset")) == pytest.approx(8.2, abs=1 / FPS) and sec(acs[2].get("start")) == pytest.approx(8.2, abs=1 / FPS)
+    vo = sorted([p for p in parse_fcpxml(generated(media)) if p.lane == -1], key=lambda p: p.start)
+    assert [p.name for p in vo] == ["V001", "K001", "V002", "V003"]
+    assert vo[2].start == pytest.approx(8.2, abs=1 / FPS) and vo[2].src_in == pytest.approx(8.2, abs=1 / FPS)
 
 
 def test_generated_clips_carry_their_key_in_the_name(media):
-    names = [a.get("name") for a in ET.fromstring(generated(media)).iter("asset-clip") if a.get("lane") == "1"]
+    names = [p.name for p in sorted(parse_fcpxml(generated(media)), key=lambda p: p.start) if p.lane == 0]
     assert names[0].startswith("V001#0 ")
 
 
@@ -78,7 +86,7 @@ def test_generated_clips_carry_their_key_in_the_name(media):
 def test_parse_gives_absolute_times_lanes_and_files(media):
     ps = parse_fcpxml(generated(media))
     v2 = [p for p in ps if p.name.startswith("V002#0")][0]
-    assert v2.lane == 1 and v2.path.endswith("b.png") and v2.start == pytest.approx(8.2, abs=0.02)
+    assert v2.lane == 0 and v2.path.endswith("b.png")  # base shots sit on the main track and v2.start == pytest.approx(8.2, abs=0.02)
     assert v2.end == pytest.approx(11.45, abs=0.02)
 
 
@@ -100,10 +108,8 @@ def test_parse_handles_resolve_style_nesting_and_odd_rationals(tmp_path):
 
 def test_positions_follow_dragged_voice_pieces(media):
     def drag(el):
-        if el.get("name") == "V002":
-            setsec(el, "offset", 9.2)
-        if el.get("name") == "V003":
-            setsec(el, "offset", 12.45)
+        if el.get("name") in ("V002", "V003"):
+            setsec(el, "offset", sec(el.get("offset")) + 1.0)
     pos = positions(parse_fcpxml(edit(generated(media), drag)), ITEMS, TIMES, "vo_edit.wav")
     assert pos["V002"][0] == pytest.approx(9.2, abs=0.02) and pos["V001"][0] == pytest.approx(0.0, abs=0.02)
 
@@ -153,10 +159,8 @@ def test_deleted_shot(media):
 
 def test_added_shot_is_an_extra_anchored_to_lines(media):
     root = ET.fromstring(generated(media))
-    gap = root.find(".//gap")
     ref = [a for a in root.iter("asset") if a.get("name") == "gag.png"][0].get("id")
-    ET.SubElement(gap, "asset-clip", ref=ref, lane="2", offset=f"{12 * FPS}/{FPS}s", start="0s",
-                  duration=f"{2 * FPS}/{FPS}s", name="gag.png")
+    attach(root, 12.0, ref=ref, lane="2", start="0s", duration=f"{2 * FPS}/{FPS}s", name="gag.png")
     t, _ = tw(media, ET.tostring(root, encoding="unicode"))
     (x,) = t["extra"]
     assert x["file"] == "gag.png" and x["lane"] == "overlay"
@@ -166,17 +170,15 @@ def test_added_shot_is_an_extra_anchored_to_lines(media):
 def test_trimmed_camman_clip_becomes_new_clip_times(media):
     def trim(el):
         if el.get("name") == "K001":  # trim 1 s off the front of his clip on A1
-            setsec(el, "start", 4.6); setsec(el, "offset", 4.6); setsec(el, "duration", 3.0)
+            setsec(el, "start", 4.6); setsec(el, "offset", sec(el.get("offset")) + 1.0); setsec(el, "duration", 3.0)
     t, _ = tw(media, edit(generated(media), trim))
     assert t["clip_times"] == {"K001": [pytest.approx(11.0, abs=0.02), pytest.approx(14.0, abs=0.02)]}
 
 
 def test_linked_audio_of_video_clips_is_ignored(media):
     root = ET.fromstring(generated(media))
-    gap = root.find(".//gap")
     ref = [a for a in root.iter("asset") if a.get("name") == "c.mp4"][0].get("id")
-    ET.SubElement(gap, "asset-clip", ref=ref, lane="-3", offset=f"{int(3.6 * FPS)}/{FPS}s", start="600/60s",
-                  duration=f"{4 * FPS}/{FPS}s", name="c.mp4")
+    attach(root, 3.6, ref=ref, lane="-3", start="600/60s", duration=f"{4 * FPS}/{FPS}s", name="c.mp4")
     t, _ = tw(media, ET.tostring(root, encoding="unicode"))
     assert t["extra"] == []
 
@@ -249,7 +251,7 @@ def test_moving_only_voice_clips_leaves_shots_following_their_lines(media):
 def test_trimming_camman_audio_never_pulls_his_video_out_of_sync(media):
     def trim(el):
         if el.get("name") == "K001":
-            setsec(el, "start", 4.6); setsec(el, "offset", 4.6); setsec(el, "duration", 3.0)
+            setsec(el, "start", 4.6); setsec(el, "offset", sec(el.get("offset")) + 1.0); setsec(el, "duration", 3.0)
         if (el.get("name") or "").startswith("K001#0"):  # even if you also drag his picture somewhere odd
             setsec(el, "offset", 5.0); setsec(el, "start", 99.0)
     t, _ = tw(media, edit(generated(media), trim))
